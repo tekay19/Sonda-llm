@@ -765,3 +765,27 @@ def test_sonuc_promptu_analiz_yapisini_ister():
     p = gorev.promptlar.SONUC_PROMPTU.lower()
     for ifade in ("güçlü", "zayıf", "öneri", "kanıt"):
         assert ifade in p, ifade
+
+
+# ---- Uzun görevler kısa kesilmesin
+def test_ilerleyen_gorev_sinirda_uzatilir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/uzun.html"}]
+              + [{"eylem": "not_al", "metin": f"Bölüm {i} bulundu"} for i in range(1, 8)])
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "orta", "min_site": 1, "maks_adim": 4, "plan": [], "inceleme": False})
+    o = calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 6  # 4 adım + bir kez yarısı kadar uzatma
+    assert any(x["tur"] == "anlatim" and "devam" in x["metin"] for x in o)
+    assert [x["durum"] for x in o if x["tur"] == "gorev_bitti"] == ["adim_siniri"]
+
+
+def test_ilerlemeyen_gorev_uzatilmaz(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}] + [{"eylem": "bak"}] * 10)
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "orta", "min_site": 1, "maks_adim": 4, "plan": [], "inceleme": False})
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 4
+
+
+def test_adim_sinirlari_uzun_gorevlere_yeter():
+    assert gorev.ayar.ADIM_SINIRI["derin"] >= 150 and gorev.ayar.MAKS_ADIM >= 150

@@ -48,7 +48,20 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
     yapilan, erken_red, form_red, son_mesaj = 0, False, False, ""
-    for adim_no in range(1, maks + 1):
+    def ilerleme():  # not sayısı ve açılan gerçek sayfa sayısı
+        return len(notlar), sum(1 for u in hafiza_.sayfalar if u != "about:blank")
+
+    adim_no, uzatildi, izler = 0, False, {}  # izler: adım -> o adımdan önceki ilerleme
+    while True:
+        if adim_no >= maks:
+            # Uzun görevler kısa kesilmesin: son adımlarda yeni not ya da sayfa varsa bir kez yarısı kadar uzat
+            pencere = max(1, min(ayar.ILERLEME_PENCERESI, maks // 2))
+            if uzatildi or ilerleme() <= izler.get(adim_no - pencere, ilerleme()):
+                break
+            uzatildi, maks = True, maks + max(1, maks // 2)
+            yield {"tur": "anlatim", "metin": "Görev beklediğimden uzun sürüyor ama ilerliyor; devam ediyorum."}
+        izler[adim_no] = ilerleme()
+        adim_no += 1
         if g.durdu.is_set():
             durum["kod"], durum["hal"] = "durduruldu", "Kullanıcı görevi durdurdu."
             return

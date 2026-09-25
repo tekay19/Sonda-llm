@@ -2,10 +2,11 @@
 
 
 
-MAKS_ADIM = 80
+MAKS_ADIM = 200
 
 
-ADIM_SINIRI = {"basit": 25, "orta": 45, "derin": 80}
+ADIM_SINIRI = {"basit": 30, "orta": 60, "derin": 150}
+ILERLEME_PENCERESI = 10  # sınırda uzatma için: son kaç adımda ilerleme olmuş mu
 
 
 BEKLEME_SURESI = 15 * 60
