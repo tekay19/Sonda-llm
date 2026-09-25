@@ -1,6 +1,6 @@
 # Gemini sağlayıcı desteği: yerel modele ek bulut seçeneği
 
-*25 Eylül 2026 · Durum: onay bekliyor*
+*25 Eylül 2026 · Durum: uygulandı (gemini-saglayici dalı). Kullanıcı kararıyla yalnızca ucuz modeller listelenir: Flash-Lite ve Flash (Pro yok).*
 
 ## Amaç
 

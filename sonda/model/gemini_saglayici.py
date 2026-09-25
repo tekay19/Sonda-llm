@@ -83,6 +83,8 @@ def _icerikler(mesajlar):
                                        thought_signature=c.get("imza") or ATLAMA_IMZASI))
         icerikler.append(types.Content(role="model" if rol == "assistant" else "user",
                                        parts=parcalar or [types.Part(text=" ")]))
+    if not icerikler and sistem:  # Gemini en az bir içerik ister: tek başına sistem istemi kullanıcı mesajı olur
+        return None, [types.Content(role="user", parts=[types.Part(text="\n\n".join(sistem))])]
     return "\n\n".join(sistem) or None, icerikler
 
 

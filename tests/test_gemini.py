@@ -259,3 +259,12 @@ def test_istemci_canli_tutulur():
     modeller_ = gs._istemci("AIzaSyCANLI0123456789abcdefghijklmnopqrs").models
     gc.collect()
     assert not modeller_._api_client._httpx_client.is_closed
+
+
+def test_yalnizca_sistem_mesaji_kullaniciya_tasinir(sahte):
+    """Gerçek hata (derin mod): json_sor kullanıcı mesajı olmadan çağrılınca Gemini 'contents are required' verdi."""
+    m = sahte(yanit(types.Part(text="{}")))
+    gs.sohbet("gemini:g", [{"role": "system", "content": "SADECE SİSTEM"}], json=True)
+    k = m.cagrilar[0]
+    assert [c.role for c in k["contents"]] == ["user"] and k["contents"][0].parts[0].text == "SADECE SİSTEM"
+    assert k["config"].system_instruction is None

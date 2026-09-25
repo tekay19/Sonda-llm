@@ -1,8 +1,9 @@
 # Sonda-llm
 
 An AI assistant that runs entirely on your own computer. It can research the web and carry out tasks in your
-browser. The model runs locally through Ollama, so your chats, memory and browsing never go to a third-party
-server. Sonda goes online only to search, read pages and do the tasks you give it.
+browser. By default the model runs locally through Ollama, so your chats, memory and browsing never go to a
+third-party server. Sonda goes online only to search, read pages and do the tasks you give it. Optionally, you can
+also use Google Gemini as a faster cloud model (see [Cloud model](#cloud-model-gemini)).
 
 The interface is in Turkish, and Sonda answers in Turkish by default. It reads English and Turkish sources alike.
 
@@ -64,6 +65,19 @@ python -m venv .venv
 Optional models: `qwen3.8:27b` (higher quality but slower) and `qwen2.5:7b` (very fast). The model picker in the
 interface shows only the models you have installed.
 
+### Cloud model (Gemini)
+
+Gemini is an alternative to the local models; it does not replace them. Open **Ayarlar** (Settings) in the sidebar,
+paste a Gemini API key and press **Kaydet ve test et** (Save and test). Two low-cost models then appear in the model
+picker, marked "(bulut)" (cloud): Gemini Flash-Lite (cheapest) and Gemini Flash. The key is stored in
+`veri/ayarlar.json` and never leaves your computer. The `GEMINI_API_KEY` environment variable is used as a fallback.
+
+- A task step takes 1 to 3 seconds with Gemini, compared with 10 to 20 seconds with the local model.
+- When a cloud model is selected, your questions and the content of the pages Sonda reads are sent to Google. A
+  password you give in a task never reaches any model: the model sees `{SIFRE_1}`, and Sonda types the real value.
+- If Gemini fails (invalid key, quota, no internet), Sonda says so. It never switches to the local model silently.
+- Page ranking still uses the local `bge-m3` embedding model, so Ollama is needed for web research.
+
 ## Running
 
 On Windows, double-click `baslat.bat`, or run:
@@ -108,6 +122,7 @@ decided at each step. The `veri/` folder is never committed.
 ```bash
 .venv\Scripts\python -m pytest                          # fast tests (safety rules, browser, task loop, server, UI)
 .venv\Scripts\python -m pytest -m model                 # tasks on local fake sites with the real model (slow)
+.venv\Scripts\python -m pytest -m gemini                # real Gemini API calls (skipped without a key)
 set SONDA_YEREL_TARAYICI=acik && .venv\Scripts\python tests\gorev_calistir.py <label>   # real-web tasks
 ```
 

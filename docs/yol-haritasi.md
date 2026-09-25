@@ -2,6 +2,18 @@
 
 *Son güncelleme: 25 Eylül 2026*
 
+## 0. Gemini sağlayıcı (25 Eylül akşamı)
+
+Sonda artık yerel modellerin yanında Gemini ile de çalışıyor (`gemini-saglayici` dalı). Ayarlar'dan anahtar eklenince
+seçicide iki ucuz model çıkıyor: Gemini Flash-Lite (en ucuz) ve Gemini Flash. Pro, pahalı olduğu için listelenmiyor.
+
+- Yerel sahte mağazadaki SSD görevi: Flash-Lite ile 11 sn, Flash ile 15 sn. Hızlı araştırma yaklaşık 20 sn sürüyor.
+- Görevde verilen şifre hiçbir modele gitmiyor, model `{SIFRE_1}` görüyor.
+- Gerçek API testleri: `.venv\Scripts\python -m pytest -m gemini`.
+
+**Açık iş:** Upwork inceleme görevini Gemini ile çalıştırıp yerel modeldeki 22 dakikalık çalışmayla karşılaştırmak
+(kullanıcının Chrome'u ve hesabıyla, kullanıcı hazır olduğunda).
+
 ## 1. Bugün yapılanlar
 
 **Test sonucu (50 soru):** 40 geçti, 9 elle kontrol edildi, 1 kaldı. Elle kontrolde 1 hata daha çıktı, yani toplam **2 gerçek hata**.
