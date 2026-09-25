@@ -121,7 +121,8 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 adimlar.append(f"{adim_no}. {e} [{no}] -> öğe yok")
                 continue
             oge = bilgi["oge"]
-            k = koruma.kontrol(karar, oge, bilgi["form_ogeleri"], gorev_metni=gorev_metni, url=t.url)
+            k = koruma.kontrol(karar, oge, bilgi["form_ogeleri"], gorev_metni=gorev_metni, url=t.url,
+                               gizliler=durum["gizli"])
             if not k.izin:
                 t.vurgula(no)
                 yield adim("engel", k.sebep)
@@ -130,7 +131,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 sebep = k.sebep
             karar["enter_izni"] = k.enter
         elif not sebep and e == "git":
-            k = koruma.kontrol(karar)
+            k = koruma.kontrol(karar, gorev_metni=gorev_metni, gizliler=durum["gizli"])
             if not k.izin:
                 geri_bildirim = k.sebep
                 adimlar.append(f"{adim_no}. git {karar['url'][:80]} -> engellendi")
@@ -148,6 +149,9 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             continue
 
         onceki_url = t.url
+        if e == "not_al":  # şifre notlara ve oradan cevaba sızmasın
+            for gizli in koruma.gizli_adaylar(gorev_metni) | durum["gizli"]:
+                karar["metin"] = str(karar["metin"]).replace(gizli, "•••")
         if e in ("yaz", "sec") and koruma.hassas_alan(oge):
             karar["gizli"] = True  # görevde verilen şifre: hiçbir çıktıda açık yazılmaz
             durum["gizli"].add(str(karar.get("metin") or karar.get("deger")))

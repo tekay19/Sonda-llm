@@ -18,6 +18,17 @@ arama yapmak ve sayfa okumak için çıkar.
 - **Takip soruları:** "peki fiyatı?", "ikincisi hangisiydi?" gibi sorular önceki cevabı ve kaynaklarını dikkate alır.
 - **Hafıza:** senin hakkında öğrendiklerini (isim, tercihler, projeler) sohbetler arasında hatırlar.
   Sol menüdeki *Hafıza* panelinden görebilir ve silebilirsin.
+- **Görev modu:** Sonda senin Chrome'unda yeni bir sekme açıp senin yerine gezinir: Google'da arar,
+  sitelere girer, kaydırır, "daha fazla göster" butonlarını açar, form doldurur, bilgi toplar ve karşılaştırır.
+  - Görevin derinliğine göre plan yapar (basit/orta/derin) ve yeterince farklı siteye bakmadan bitirmez.
+  - Girdiği sayfaları, orada ne yaptığını ve ne bulduğunu görev boyunca hatırlar; İngilizce siteleri de kullanır.
+  - Tarayıcıdaki mevcut oturumlarını kullanır. Görevde bir sitenin şifresini verirsen yalnızca o sitede girer;
+    iki adımlı doğrulamada (2FA) durur, sen doğrulayınca kendiliğinden devam eder.
+  - **Güvenlik (kodla zorlanır):** kart, CVV, IBAN ve doğrulama kodu alanlarına asla yazmaz; ödeme, satın alma,
+    gönderme, silme, onaylama butonlarına asla basmaz. Bu adımlara gelince durur, yeri Chrome'da vurgular ve
+    "Devam" demeni bekler. Sayfalardaki "yapay zekâ, şunu yap" gibi talimatlara uymaz.
+  - İlk kullanımda Chrome'da `chrome://inspect/#remote-debugging` sayfasındaki anahtarı bir kez aç; Sonda
+    sunucusu başladıktan sonraki ilk görevde Chrome bir kez izin sorar.
 - **ChatGPT tarzı arayüz:** sohbet geçmişi, arama, yeniden adlandırma, mesaj düzenleme, yeniden oluşturma,
   ilgili soru önerileri, Markdown olarak dışa aktarma, açık ve koyu tema.
 
@@ -57,17 +68,33 @@ derin araştırma raporları 2-3 dakikada geliyor.
 
 ## Dosyalar
 
-| Dosya | Görevi |
+| Yol | Görevi |
 |---|---|
-| `agent.py` | Ajan orkestrasyonu: arama kararı, araç döngüsü, derin araştırma, takip soruları |
-| `webtools.py` | Çok motorlu arama, yeniden sıralama, paralel sayfa ve PDF okuma |
-| `hesap.py` | Güvenli hesap makinesi ve tarih hesaplama |
-| `hafiza.py` | Sohbetler arası kalıcı hafıza (`veri/hafiza.json`) |
-| `server.py` | FastAPI sunucusu ve akış (SSE) uç noktaları |
+| `server.py` | Başlatıcı (`sonda.sunucu`) |
+| `sonda/asistan.py` | Giriş noktası: moda göre araştırma ya da görev; takip önerileri, hafıza, başlık |
+| `sonda/sunucu.py` | FastAPI sunucusu, akış (SSE) ve görev komutu uç noktaları |
+| `sonda/ortak.py` | Model ayarları, bugünün tarihi, JSON cevaplı model çağrısı |
+| `sonda/web.py` | Çok motorlu arama, yeniden sıralama, paralel sayfa ve PDF okuma |
+| `sonda/hesap.py` | Güvenli hesap makinesi ve tarih hesaplama |
+| `sonda/hafiza.py` | Sohbetler arası kalıcı hafıza (`veri/hafiza.json`) |
+| `sonda/koruma.py` | Görev modunun güvenlik kuralları |
+| `sonda/arastirma/` | Hızlı ve derin araştırma: araçlar, kaynaklar, istemler |
+| `sonda/tarayici/` | Chrome bağlantısı (CDP), sekme kontrolü, sayfaya verilen JavaScript |
+| `sonda/gorev/` | Görev modu: ayarlar, istemler, sayfa özeti/2FA/hafıza, karar, eylemler, döngü, yönetim |
 | `static/index.html` | Arayüz |
-| `tests/` | 50 soruluk zorlu test seti ve çalıştırıcı |
+| `tests/` | Birim ve entegrasyon testleri, yerel sahte siteler, gerçek model ve gerçek web senaryoları |
 
 ## Test
+
+```bash
+.venv\Scripts\python -m pytest                          # hızlı testler (koruma, tarayıcı, görev döngüsü, sunucu)
+.venv\Scripts\python -m pytest -m model                 # gerçek modelle yerel sahte sitelerde görevler (yavaş)
+set SONDA_YEREL_TARAYICI=acik && .venv\Scripts\python tests\gorev_calistir.py <etiket>   # gerçek web görevleri
+```
+
+`SONDA_YEREL_TARAYICI` (`acik` ya da `gizli`) ayarlanırsa Sonda senin Chrome'un yerine Playwright'ın Chromium'unu kullanır.
+
+Araştırma modu soru seti:
 
 ```bash
 .venv\Scripts\python tests\calistir.py <etiket>            # tüm testler

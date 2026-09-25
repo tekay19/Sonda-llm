@@ -10,7 +10,7 @@ ve doğrulama kodları görevde verilse bile kullanıcıya kalır.
 """
 import re
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 _TR = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgiosuCGIOSU")
 
@@ -108,6 +108,28 @@ def _sifre_alani(oge):
     return oge.get("tip") == "password" or otomatik in ("current-password", "new-password") or bool(_SIFRE.search(metin))
 
 
+# Sıradan kelime (harf, arada - ya da ' olabilir): "ile", "upwork'e", "e-posta" şifre adayı sayılmaz
+_KELIME = re.compile(r"[^\W\d_]+([-'][^\W\d_]+)*")
+
+
+def gizli_adaylar(gorev_metni):
+    """Görev metninde şifre sözcüğünün yakınında (3 kelime) geçen, şifreye benzeyen değerler."""
+    temiz = [k.strip("'\"“”‘’.,;:()") for k in str(gorev_metni or "").split()]
+    adaylar = set()
+    for i, k in enumerate(temiz):
+        if not _SIFRE.search(sade(k)):
+            continue
+        for a in temiz[max(0, i - 3):i] + temiz[i + 1:i + 4]:
+            if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a):
+                adaylar.add(a)
+    return adaylar
+
+
+def _gizli_iceriyor(metin, gizliler):
+    metin = unquote(unquote(str(metin or "")))
+    return any(g in metin for g in gizliler if len(g) >= 4)
+
+
 def _submit_mu(oge):
     if oge.get("form", -1) < 0:
         return False
@@ -115,17 +137,22 @@ def _submit_mu(oge):
            (oge.get("etiket") == "input" and oge.get("tip") in ("submit", "image"))
 
 
-def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url=""):
+def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=()):
     ad = eylem.get("eylem")
+    gizli = set(gizliler) | gizli_adaylar(gorev_metni)
     if ad == "git":
-        url = str(eylem.get("url") or "").strip()
-        if urlparse(url).scheme not in ("http", "https"):
-            return Karar(False, f"Yalnızca http ve https adreslerine gidilebilir: {url[:80]}")
+        hedef = str(eylem.get("url") or "").strip()
+        if urlparse(hedef).scheme not in ("http", "https"):
+            return Karar(False, f"Yalnızca http ve https adreslerine gidilebilir: {hedef[:80]}")
+        if _gizli_iceriyor(hedef, gizli):
+            return Karar(False, "🔒 Bu adres görevde verdiğin şifreyi içeriyor; şifre hiçbir adrese yazılamaz.")
         return Karar(True)
     if ad in ("yaz", "sec"):
         deger = str(eylem.get("metin") or eylem.get("deger") or "")
         if hassas_alan(oge) and _sifre_alani(oge) and len(deger) >= 4 and deger in gorev_metni                 and _kimlik_gorevi(gorev_metni, url):
             return Karar(True)
+        if _gizli_iceriyor(deger, gizli):
+            return Karar(False, "🔒 Görevde verdiğin şifre yalnızca o sitenin şifre alanına yazılabilir.")
         if hassas_alan(oge):
             return Karar(False, f"🔒 “{oge_adi(oge)}” hassas bir alan. Kart, şifre ve doğrulama bilgilerini sen girmelisin.")
         return Karar(True, enter=ad == "yaz" and bool(eylem.get("enter")) and arama_kutusu(oge))
