@@ -79,6 +79,14 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .hafiza-oge button { border: 0; background: none; color: var(--soluk); width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; flex: none; }
 .hafiza-oge button:hover { color: var(--hata); background: var(--cizgi); }
 .hafiza-oge svg { width: 15px; height: 15px; }
+.ayar-alan { display: flex; flex-direction: column; gap: 8px; margin: 0 6px 12px; }
+.ayar-alan input { border: 1px solid var(--cizgi); border-radius: 9px; padding: 8px 10px; background: var(--yuzey); color: inherit; font: inherit; min-width: 0; }
+.ayar-butonlar { display: flex; gap: 8px; flex-wrap: wrap; }
+.ayar-butonlar button { border: 1px solid var(--cizgi); background: none; border-radius: 9px; padding: 7px 12px; font-size: 13.5px; color: inherit; }
+.ayar-butonlar button:hover { background: var(--yuzey-2); }
+.ayar-butonlar [data-gemini-sil] { color: var(--hata); }
+.ayar-durum { font-size: 13.5px; margin: 0 6px 12px; }
+.ayar-durum.hata { color: var(--hata); }
 .hafiza-temizle { margin: 12px 6px 0; border: 1px solid var(--cizgi); background: none; border-radius: 9px; padding: 7px 12px; font-size: 13.5px; color: var(--hata); }
 .gecmis-ara svg { position: absolute; left: 10px; top: 9px; width: 16px; height: 16px; color: var(--soluk); }
 .gecmis-ara input {
@@ -402,6 +410,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
   <symbol id="i-dal" viewBox="0 0 24 24"><path d="M5 4v8a4 4 0 0 0 4 4h10M15 12l4 4-4 4"/></symbol>
   <symbol id="i-beyin" viewBox="0 0 24 24"><path d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 3 3 3 3 0 0 0 3-3V7a3 3 0 0 0-3-3ZM15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-3 3 3 3 0 0 1-3-3"/></symbol>
   <symbol id="i-hesap" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></symbol>
+  <symbol id="i-ayar" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.2-8.2M16 7l2.5 2.5M14 9l2 2"/></symbol>
   <symbol id="i-hafiza" viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4 12.7V19h8v-3.3A7 7 0 0 0 12 3ZM9.5 22h5"/></symbol>
   <symbol id="i-yaz" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></symbol>
   <symbol id="i-imlec" viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6Z"/><path d="m13 13 5 5"/></symbol>
@@ -417,6 +426,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
     <button class="yeni-btn" id="yeni-sohbet"><svg class="ik"><use href="#i-yeni"/></svg>Yeni sohbet<kbd>Ctrl Shift O</kbd></button>
     <div class="gecmis-ara"><svg class="ik"><use href="#i-ara"/></svg><input id="gecmis-ara" type="search" placeholder="Sohbetlerde ara" aria-label="Sohbetlerde ara"></div>
     <button class="yeni-btn hafiza-btn" id="hafiza-ac"><svg class="ik"><use href="#i-hafiza"/></svg>Hafıza<span id="hafiza-sayi"></span></button>
+    <button class="yeni-btn hafiza-btn" id="ayarlar-ac"><svg class="ik"><use href="#i-ayar"/></svg>Ayarlar</button>
     <nav class="gecmis" id="gecmis"></nav>
     <div class="kenar-alt">
       <div class="durum" id="durum" role="status"><i></i><span>Bağlantı kontrol ediliyor</span></div>
@@ -502,21 +512,32 @@ $("#menu-kapat").onclick = () => mobil() ? U.classList.remove("mobil-menu") : (U
 $("#menu-ac").onclick = () => mobil() ? U.classList.add("mobil-menu") : (U.classList.remove("kapali"), depo.yaz("sonda-menu", true));
 $("#perde").onclick = () => U.classList.remove("mobil-menu");
 if (depo.oku("sonda-menu", true) === false) U.classList.add("kapali");
-$("#cekmece-kapat").onclick = () => U.classList.remove("cekmece-acik", "hafiza-modu");
+$("#cekmece-kapat").onclick = () => U.classList.remove("cekmece-acik", "hafiza-modu", "ayar-modu");
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") { U.classList.remove("cekmece-acik", "mobil-menu", "hafiza-modu"); }
+  if (e.key === "Escape") { U.classList.remove("cekmece-acik", "mobil-menu", "hafiza-modu", "ayar-modu"); }
   if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); yeniSohbet(); }
 });
 
 // ---------- modeller
-fetch("/api/modeller").then(r => r.json()).then(liste => {
-  const sec = $("#model");
-  sec.innerHTML = liste.length ? liste.map(m => `<option value="${m.ad}">${kacis(m.etiket)}</option>`).join("")
-                               : "<option value=''>Model bulunamadı</option>";
-  const k = depo.oku("sonda-model", null);
-  if (k && liste.some(m => m.ad === k)) sec.value = k;
-}).catch(() => { $("#model").innerHTML = "<option value=''>Sunucuya ulaşılamadı</option>"; });
-$("#model").onchange = e => depo.yaz("sonda-model", e.target.value);
+function modelleriYukle() {
+  return fetch("/api/modeller").then(r => r.json()).then(liste => {
+    const sec = $("#model");
+    const onceki = sec.value;
+    sec.innerHTML = liste.length ? liste.map(m => `<option value="${m.ad}">${kacis(m.etiket)}</option>`).join("")
+                                 : "<option value=''>Model bulunamadı</option>";
+    const k = onceki || depo.oku("sonda-model", null);
+    if (k && liste.some(m => m.ad === k)) sec.value = k;
+    rozetGuncelle();
+  }).catch(() => { $("#model").innerHTML = "<option value=''>Sunucuya ulaşılamadı</option>"; });
+}
+modelleriYukle();
+function rozetGuncelle() {
+  const bulut = $("#model").value.startsWith("gemini:");
+  $(".yerel-rozet span").textContent = bulut
+    ? "Bulut model: soruların ve okunan sayfalar Google'a gider (şifreler hariç). Sohbetlerin yalnızca bu tarayıcıda saklanır."
+    : "Model bu bilgisayarda çalışır. Sohbetlerin yalnızca bu tarayıcıda saklanır.";
+}
+$("#model").onchange = e => { depo.yaz("sonda-model", e.target.value); rozetGuncelle(); };
 
 // ---------- mod
 function modSec(m) {
@@ -735,7 +756,7 @@ function asistanGuncelle(d, m, canli) {
 
 // ---------- kaynak çekmecesi
 function cekmeceAc(iz, vurgu) {
-  U.classList.remove("hafiza-modu");
+  U.classList.remove("hafiza-modu", "ayar-modu");
   $("#cekmece-baslik").textContent = `Kaynaklar (${iz.kaynaklar.length})`;
   $("#cekmece-govde").innerHTML = iz.kaynaklar.map(k => `
     <a class="ck-kaynak${String(k.no) === String(vurgu) ? " vurgu" : ""}" data-no="${k.no}" href="${kacis(k.url)}" target="_blank" rel="noopener">
@@ -893,7 +914,7 @@ async function gonder() {
         else if (o.tur === "yon") m.yon = o.hedef;
         else if (o.tur === "anlatim") (m.anlatim ||= []).push(o.metin);
         else if (o.tur === "gorev_bitti") m.gorevDurum = o.durum;
-        else if (o.tur === "hata") m.hata = `Bir hata oluştu: ${o.metin}.` + (/ollama|connect|model/i.test(o.metin) ? " Ollama'nın açık olduğunu ve seçili modelin indirildiğini kontrol et." : "");
+        else if (o.tur === "hata") m.hata = o.bulut ? o.metin : `Bir hata oluştu: ${o.metin}.` + (/ollama|connect|model/i.test(o.metin) ? " Ollama'nın açık olduğunu ve seçili modelin indirildiğini kontrol et." : "");
       }
       ciz();
     }
@@ -948,6 +969,7 @@ async function hafizaCiz(ac = false) {
   try { liste = await (await fetch("/api/hafiza")).json(); } catch {}
   $("#hafiza-sayi").textContent = liste.length || "";
   if (!ac && !U.classList.contains("hafiza-modu")) return;
+  U.classList.remove("ayar-modu");
   U.classList.add("hafiza-modu");
   $("#cekmece-baslik").textContent = "Hafıza";
   $("#cekmece-govde").innerHTML = `<p class="hafiza-aciklama">Sonda sohbetlerinden senin hakkında öğrendiklerini burada saklar ve tüm sohbetlerde kullanır. Bu bilgiler yalnızca bu bilgisayarda durur. Bir şeyi hatırlamasını istersen "bunu hatırla" demen yeterli.</p>`
@@ -957,7 +979,44 @@ async function hafizaCiz(ac = false) {
   U.classList.add("cekmece-acik");
 }
 $("#hafiza-ac").onclick = () => { hafizaCiz(true); U.classList.remove("mobil-menu"); };
+
+// ---------- ayarlar paneli (sağ çekmecede)
+async function ayarlarCiz(durum = "") {
+  let a = { gemini: { var: false, son4: "" } };
+  try { a = await (await fetch("/api/ayarlar")).json(); } catch {}
+  U.classList.remove("hafiza-modu");
+  U.classList.add("ayar-modu");
+  $("#cekmece-baslik").textContent = "Ayarlar";
+  $("#cekmece-govde").innerHTML = `
+    <p class="hafiza-aciklama"><b>Gemini (bulut model)</b><br>Anahtar eklersen model seçicide ucuz Gemini modelleri çıkar. Anahtar yalnızca bu bilgisayarda saklanır. Bulut model seçtiğinde soruların ve ziyaret edilen sayfaların içeriği Google'a gider; hesaplarınla çalışırken ücretli katman önerilir. Görevde verdiğin şifre hiçbir modele gönderilmez.</p>
+    <div class="ayar-alan">
+      <input id="gemini-anahtar" type="password" autocomplete="off" aria-label="Gemini API anahtarı" placeholder="${a.gemini.var ? `Kayıtlı anahtar ${kacis(a.gemini.son4)}` : "Gemini API anahtarı"}">
+      <div class="ayar-butonlar"><button data-gemini-kaydet>Kaydet ve test et</button>${a.gemini.var ? "<button data-gemini-sil>Sil</button>" : ""}</div>
+    </div>
+    ${durum}`;
+  U.classList.add("cekmece-acik");
+}
+$("#ayarlar-ac").onclick = () => { ayarlarCiz(); U.classList.remove("mobil-menu"); };
 $("#cekmece-govde").addEventListener("click", async e => {
+  const kaydet = e.target.closest("[data-gemini-kaydet]");
+  if (kaydet) {
+    kaydet.disabled = true; kaydet.textContent = "Test ediliyor…";
+    let r = null, j = {};
+    try {
+      r = await fetch("/api/ayarlar/gemini", { method: "POST", headers: { "Content-Type": "application/json" },
+                                               body: JSON.stringify({ anahtar: $("#gemini-anahtar").value }) });
+      j = await r.json();
+    } catch {}
+    await modelleriYukle();
+    return ayarlarCiz(r?.ok ? `<p class="ayar-durum tamam">Anahtar kaydedildi (${kacis(j.son4)}).</p>`
+                            : `<p class="ayar-durum hata">${kacis(j.detail || "Kaydedilemedi.")}</p>`);
+  }
+  if (e.target.closest("[data-gemini-sil]")) {
+    await fetch("/api/ayarlar/gemini", { method: "DELETE" });
+    await modelleriYukle();
+    bildir("Gemini anahtarı silindi");
+    return ayarlarCiz();
+  }
   const sil = e.target.closest("[data-hafiza-sil]");
   if (sil) { await fetch(`/api/hafiza/${sil.dataset.hafizaSil}`, { method: "DELETE" }); bildir("Unutuldu"); return hafizaCiz(); }
   const t = e.target.closest("[data-hafiza-temizle]");
