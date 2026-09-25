@@ -381,3 +381,12 @@ def test_yer_tut_metni_degistirir():
 
 def test_sifre_yoksa_bos_harita():
     assert koruma.yer_tutucular("en ucuz ssd'yi bul") == {}
+
+
+# ---- Final inceleme: kullanıcı adı şifre yer tutucusu sanılmasın
+def test_yer_tutucu_yalnizca_sifre_sozcugunden_sonraki_deger():
+    assert koruma.yer_tutucular("instagram.com a gir kullanıcı ali_99 şifre Kedi-1234") == {"{SIFRE_1}": "Kedi-1234"}
+
+
+def test_yer_tutucu_sozcukten_once_gelen_sifre():
+    assert koruma.yer_tutucular("upwork.com'a 'abc12345' şifresiyle gir") == {"{SIFRE_1}": "abc12345"}

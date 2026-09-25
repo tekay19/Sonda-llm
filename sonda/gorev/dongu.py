@@ -68,9 +68,10 @@ def bak(t, ekran_iste):
     return sayfa, ekran
 
 
-def model_gorev_metni(gorev_metni, harita):
-    """Modelin gördüğü görev metni: şifreler yer tutucuyla değişir, gerçek değeri kod yazar."""
-    metin = koruma.yer_tut(gorev_metni, harita)
+def model_gorev_metni(gorev_metni, harita, onceki_gizli=()):
+    """Modelin gördüğü görev metni: şifreler yer tutucuyla değişir, gerçek değeri kod yazar. Önceki mesajlarda
+    verilmiş şifreler görevde şifre sözcüğü olmadan tekrarlanırsa ••• olur."""
+    metin = koruma.gizle(koruma.yer_tut(gorev_metni, harita), set(onceki_gizli) - set(harita.values()))
     if harita:
         metin += ("\n(Görevde verilen şifre " + ", ".join(harita) + " olarak gizlendi. Şifre alanına tam olarak "
                   "bu yer tutucuyu yaz; gerçek şifreyi Sonda doldurur.)")
@@ -87,7 +88,9 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     durum["gizli"].update(koruma.gizli_adaylar(gorev_metni))
     kayit = GorevKaydi(g.id, durum["gizli"])
     harita = koruma.yer_tutucular(gorev_metni)
-    model_metni = model_gorev_metni(gorev_metni, harita)  # modele giden her istem bunu kullanır
+    onceki_gizli = durum.get("onceki_gizli", set())
+    model_metni = model_gorev_metni(gorev_metni, harita, onceki_gizli)  # modele giden her istem bunu kullanır
+    sifreler = set(harita.values()) | onceki_gizli  # sayfa şifreyi geri gösterirse istemde gizlenir
     def ilerleme():  # not sayısı ve açılan gerçek sayfa sayısı
         return len(notlar), sum(1 for u in hafiza_.sayfalar if u != "about:blank")
 
@@ -148,7 +151,8 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 sayfa, ekran = bak(t, ekran_iste)
         hafiza_.goruldu(sayfa)
         ekran_iste = False
-        istem_metni = istem(model_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa, geri_bildirim, adim_no, maks)
+        istem_metni = koruma.gizle(istem(model_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa, geri_bildirim,
+                                         adim_no, maks), sifreler)
         dusun = dusunmeli(derinlik, adim_no, geri_bildirim)
         karar = kararlar.karar_al(model, istem_metni, ekran, dusun)
         kayit.yaz({"adim": adim_no, "zaman": time.strftime("%H:%M:%S"), "url": sayfa["url"], "dusun": dusun,
@@ -384,7 +388,8 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
         yield {"tur": "token", "metin": str(h)}
         yield {"tur": "cevap_bitti", "metin": str(h)}
         return
-    derinlik = kararlar.derinlik_belirle(model, model_gorev_metni(gorev_metni, koruma.yer_tutucular(gorev_metni)), onceki)
+    derinlik = kararlar.derinlik_belirle(
+        model, model_gorev_metni(gorev_metni, koruma.yer_tutucular(gorev_metni), onceki_gizli), onceki)
     yield {"tur": "adim", "tip": "plan", "detay": derinlik["plan"],
            "metin": f"{derinlik['derinlik'].capitalize()} görev: en az {derinlik['min_site']} site, "
                     f"en fazla {derinlik['maks_adim']} adım"}
@@ -392,6 +397,7 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
     durum = {"notlar": [], "adimlar": GizliListe(gizliler), "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": gizliler,
              "derinlik": derinlik}
     durum["gizli"].update(onceki_gizli)
+    durum["onceki_gizli"] = onceki_gizli
     try:
         yield from dongu(g, gorev_metni, onceki, model, t, durum, derinlik)
     except tarayici.SekmeKapandi:

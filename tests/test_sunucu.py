@@ -195,3 +195,39 @@ def test_baslik_sifreyi_gormez(monkeypatch):
     monkeypatch.setattr(sunucu, "baslik_uret", lambda model, soru: gorulen.append(soru) or "Başlık")
     istemci.post("/api/baslik", json={"soru": "upwork şifrem Parola-7788 ile gir", "model": "gemini:x"})
     assert gorulen and "Parola-7788" not in gorulen[0]
+
+
+# ---- Final inceleme: şifre başka yollardan modele gitmesin
+def _yakala(monkeypatch, hedef="hizli"):
+    gorulen = []
+    monkeypatch.setattr(asistan, "hafizayi_guncelle", lambda model, mesaj: gorulen.append(("hafiza", mesaj)))
+    monkeypatch.setattr(asistan, hedef, lambda *a, **k: gorulen.append(a) or iter([]))
+    monkeypatch.setattr(asistan, "yon_belirle", lambda model, soru, gecmis: gorulen.append((soru, gecmis)) or "sohbet")
+    return gorulen
+
+
+def test_diger_sohbet_basliklari_sifresiz(monkeypatch):
+    gorulen = _yakala(monkeypatch)
+    list(asistan.calistir("dolar kaç", [], "gemini:x", "hizli", (), ["instagram şifre Kedi-1234 ile gir"]))
+    assert gorulen and "Kedi-1234" not in repr(gorulen)
+
+
+def test_baslik_yedegi_sifresiz(monkeypatch):
+    monkeypatch.setattr(sunucu, "baslik_uret", lambda *a: (_ for _ in ()).throw(RuntimeError("kota")))
+    r = istemci.post("/api/baslik", json={"soru": "instagram şifre Kedi-1234 ile gir", "model": "gemini:x"})
+    assert "Kedi-1234" not in r.json()["baslik"]
+
+
+def test_hafiza_cikarimi_sifreyi_gormez(monkeypatch):
+    import time
+    gorulen = _yakala(monkeypatch)
+    list(asistan.calistir("benim instagram şifrem Kedi-1234, güçlü mü?", [], "gemini:x", "hizli"))
+    time.sleep(0.2)  # hafıza güncellemesi arka planda
+    assert any(g[0] == "hafiza" for g in gorulen) and "Kedi-1234" not in repr(gorulen)
+
+
+def test_onceki_mesajdaki_sifre_tekrarlaninca_gizlenir(monkeypatch):
+    gorulen = _yakala(monkeypatch, "sohbet")
+    list(asistan.calistir("Aynı hesapla Kedi-1234 kullanarak twitter.com'a da gir",
+                          [{"role": "user", "content": "instagram şifrem Kedi-1234"}], "gemini:x", "gorev"))
+    assert gorulen and "Kedi-1234" not in repr(gorulen)

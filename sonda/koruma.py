@@ -149,11 +149,10 @@ def _kesin_aday(a):
         and not _SIFRE.search(sade(a))
 
 
-def gizli_adaylar(gorev_metni):
-    """Görevde verilen şifreler: şifre sözcüğünden hemen sonraki kelime (şekli ne olursa olsun: "sunflower",
-    "correct-horse-battery") ve yakınındaki (3 kelime) şifreye benzeyen değerler ("'abc123' şifresiyle")."""
+def _adaylar(gorev_metni):
+    """(doğrudan, yakın): şifre sözcüğünden hemen sonraki kelimeler ve yakınındaki (3 kelime) şifreye benzeyen değerler."""
     temiz = [k.strip("'\"“”‘’.,;:()") for k in str(gorev_metni or "").split()]
-    adaylar = set()
+    dogrudan, yakin = set(), set()
     for i, k in enumerate(temiz):
         if not _SIFRE.search(sade(k)):
             continue
@@ -161,11 +160,19 @@ def gizli_adaylar(gorev_metni):
         while j < len(temiz) and sade(temiz[j]) in ("is", "olarak", ""):
             j += 1
         if j < len(temiz) and _kesin_aday(temiz[j]):
-            adaylar.add(temiz[j])
+            dogrudan.add(temiz[j])
         for a in temiz[max(0, i - 3):i] + temiz[i + 1:i + 4]:
-            if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a) and not _alan_adi_mi(a):
-                adaylar.add(a)
-    return adaylar
+            if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a)                     and not _alan_adi_mi(re.split(r"['’]", a)[0]):  # "upwork.com'a" alan adıdır
+                yakin.add(a)
+    return dogrudan, yakin
+
+
+def gizli_adaylar(gorev_metni):
+    """Görevde verilen şifreler: şifre sözcüğünden hemen sonraki kelime (şekli ne olursa olsun: "sunflower",
+    "correct-horse-battery") ve yakınındaki (3 kelime) şifreye benzeyen değerler ("'abc123' şifresiyle").
+    Temkinli: kullanıcı adı gibi yakındaki değerler de gizlenir."""
+    dogrudan, yakin = _adaylar(gorev_metni)
+    return dogrudan | yakin
 
 
 def _gizli_iceriyor(metin, gizliler):
@@ -199,7 +206,10 @@ YER_TUTUCU = re.compile(r"\{SIFRE_\d+\}")
 def yer_tutucular(metin):
     """Görevdeki şifreler için {SIFRE_1}, {SIFRE_2}...: model yalnızca bunları görür, gerçek değeri kod yazar."""
     metin = str(metin or "")
-    adaylar = sorted(gizli_adaylar(metin), key=lambda a: (metin.find(a), -len(a)))
+    # Yalnızca şifre sözcüğünden hemen sonraki değer: yakındaki kullanıcı adı ("kullanıcı ali_99 şifre X")
+    # yer tutucu olursa model onu şifre alanına yazabilir. Doğrudan değer yoksa ("'abc123' şifresiyle") yakındakiler.
+    dogrudan, yakin = _adaylar(metin)
+    adaylar = sorted(dogrudan or yakin, key=lambda a: (metin.find(a), -len(a)))
     return {f"{{SIFRE_{i}}}": a for i, a in enumerate(adaylar, 1)}
 
 

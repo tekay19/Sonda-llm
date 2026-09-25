@@ -1169,3 +1169,24 @@ def test_yer_tutucu_baska_sitede_yazilamaz(sahte, yerel_tarayici_ac, site, monke
              kayit=kayit, komutlar=["durdur"])
     assert isinde(lambda: kayit["t"].sayfa.input_value("[name=sifre]")) == ""
     isinde(kayit["t"]._kapat_asil)
+
+
+# ---- Final inceleme: önceki mesajdaki şifre görevde tekrarlanırsa ve sayfa şifreyi gösterirse
+def test_onceki_sifre_gorevde_tekrarlaninca_modele_gitmez(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "bitir"}])
+    gorulen = []
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda model, metin, onceki: gorulen.append(metin + onceki) or dict(DERINLIK))
+    list(gorev.calistir(f"Aynı hesapla Kedi-1234 kullanarak {site}/giris.html sayfasına gir", "sahte",
+                        gecmis=[{"role": "user", "content": "instagram şifrem Kedi-1234"}],
+                        tarayici_ac=yerel_tarayici_ac))
+    assert "Kedi-1234" not in "\n".join(m.istemler + gorulen)
+
+
+def test_sayfadaki_sifre_istemde_gizlenir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    """Site girilen şifreyi sayfada geri gösterirse ("Kedi-1234 hatalı") istem modele gitmeden gizlenir."""
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "bitir"}])
+    asil = gorev.dongu.istem
+    monkeypatch.setattr(gorev.dongu, "istem", lambda *a: asil(*a) + "\nSAYFA: Şifre Kedi-1234 hatalı")
+    calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sayfasında şifrem Kedi-1234 ile gir")
+    assert "Kedi-1234" not in "\n".join(m.istemler) and "SAYFA: Şifre ••• hatalı" in m.istemler[0]

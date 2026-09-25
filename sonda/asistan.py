@@ -24,9 +24,10 @@ _KISISEL = re.compile(r"\b(ben|benim|bana|beni|bende|adım|ismim|hatırla|unutma
                       re.IGNORECASE)
 
 
-def sifresiz(metin):
-    """Mesajda verilen şifre yönlendirme, başlık ve sohbet modellerine gitmesin (görev kendi yer tutucusunu kullanır)."""
-    return koruma.gizle(metin, koruma.gizli_adaylar(metin))
+def sifresiz(metin, gizliler=()):
+    """Mesajda verilen şifre yönlendirme, başlık ve sohbet modellerine gitmesin (görev kendi yer tutucusunu kullanır).
+    gizliler: başka mesajlarda verilmiş şifreler (şifre sözcüğü olmadan tekrarlanabilir)."""
+    return koruma.gizle(metin, koruma.gizli_adaylar(metin) | set(gizliler))
 
 
 def oneriler(model, soru, cevap):
@@ -65,8 +66,11 @@ def baslik_uret(model, soru):
 def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), oneri=True):
     basla = time.time()
     cevap = ""
-    temiz_soru = sifresiz(soru)
-    temiz_gecmis = [{**m, "content": sifresiz(m["content"])} for m in gecmis]
+    gizliler = set().union(koruma.gizli_adaylar(soru), *(koruma.gizli_adaylar(m["content"]) for m in gecmis),
+                           *(koruma.gizli_adaylar(b) for b in diger_sohbetler))
+    temiz_soru = sifresiz(soru, gizliler)
+    temiz_gecmis = [{**m, "content": sifresiz(m["content"], gizliler)} for m in gecmis]
+    diger_sohbetler = [sifresiz(b, gizliler) for b in diger_sohbetler]  # başlık ilk mesajdan kesilmiş olabilir
     try:
         if mod == "gorev":
             # Görev modunda her mesaj tarayıcı açmasın: sohbet ve kısa bilgi soruları doğrudan cevaplanır
@@ -96,4 +100,4 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
         yield {"tur": "hata", "metin": f"{type(e).__name__}: {e}"}
     finally:
         if mod != "gorev":  # görev mesajında şifre olabilir: hafızaya yazılmasın
-            threading.Thread(target=hafizayi_guncelle, args=(model, soru), daemon=True).start()
+            threading.Thread(target=hafizayi_guncelle, args=(model, temiz_soru), daemon=True).start()

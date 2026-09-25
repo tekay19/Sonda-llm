@@ -62,7 +62,7 @@ def baslik(istek: BaslikIstegi):
     try:
         return {"baslik": baslik_uret(istek.model, sifresiz(istek.soru))}
     except Exception:
-        return {"baslik": istek.soru[:60]}
+        return {"baslik": sifresiz(istek.soru)[:60]}
 
 
 @app.get("/api/hafiza")
