@@ -395,3 +395,39 @@ def test_yer_tutucu_sozcukten_once_gelen_sifre():
 def test_parola_iceren_sifreden_sonraki_kelime_sifre_sayilmaz():
     """'Parola-7788' şifrenin kendisi; ardından gelen 'gmail' şifre değil."""
     assert koruma.gizli_adaylar("upwork.com şifrem Parola-7788, gmail şifresi abc!12345") == {"Parola-7788", "abc!12345"}
+
+
+# ---- serbest mod: kullanıcı görevden önce "butonlara kendisi bassın" kutucuğunu işaretledi
+@pytest.mark.parametrize("metin", [
+    "Gönder", "Başvur", "Başvuruyu Gönder", "Onayla", "Sil", "Kaldır", "Giriş Yap", "Üye Ol", "Kayıt Ol",
+    "Submit", "Send", "Apply", "Delete", "Remove", "Confirm", "Sign in", "Log in", "Register", "Submit proposal",
+])
+def test_serbest_modda_son_adim_butonlari_izinli(metin):
+    assert koruma.kontrol({"eylem": "tikla", "no": 1}, buton(metin), serbest=True).izin, metin
+
+
+@pytest.mark.parametrize("metin", [
+    "Öde", "Öde 499 TL", "Ödeme Yap", "Ödemeyi Tamamla", "Ödemeye Geç", "Satın Al", "Hemen Al", "Siparişi Onayla",
+    "Siparişi Tamamla", "Sipariş Ver", "Siparişinizi verin", "Hesabı Kapat", "Hesabımı Sil", "Abone Ol", "Pay",
+    "Pay now", "Buy now", "Purchase", "Place order", "Place your order", "Checkout", "Subscribe", "Confirm payment",
+    "Complete purchase", "Delete account", "Delete my account", "Close account", "Hire", "Hire now", "Teklifi kabul et",
+    "Accept offer", "Bağış yap", "Donate", "Havale yap", "Para gönder", "Send money", "Book now",
+])
+def test_serbest_modda_para_ve_hesap_silme_butonlari_yine_engellenir(metin):
+    assert not koruma.kontrol({"eylem": "tikla", "no": 1}, buton(metin), serbest=True).izin, metin
+
+
+def test_serbest_modda_odeme_sayfasindaki_devam_yine_engellenir():
+    k = koruma.kontrol({"eylem": "tikla", "no": 1}, buton("Devam", tip="submit", form=0), serbest=True,
+                       url="https://site.com/checkout")
+    assert not k.izin
+
+
+def test_serbest_modda_kart_formu_gonderilemez_ve_hassas_alana_yazilamaz():
+    gonder = buton("Kaydet", tip="submit", form=0)
+    assert not koruma.kontrol({"eylem": "tikla", "no": 1}, gonder, [oge(ad="cardNumber", form=0)], serbest=True).izin
+    assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "4111"}, oge(ad="cardNumber"), serbest=True).izin
+
+
+def test_serbest_olmadan_davranis_degismez():
+    assert not koruma.kontrol({"eylem": "tikla", "no": 1}, buton("Gönder")).izin

@@ -283,6 +283,10 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .mod-sec button svg { width: 15px; height: 15px; }
 .mod-sec button:hover { color: var(--metin); }
 .mod-sec button[aria-pressed="true"] { background: var(--vurgu-zemin); border-color: transparent; color: var(--vurgu); font-weight: 500; }
+.serbest { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--soluk); cursor: pointer; user-select: none; white-space: nowrap; }
+.serbest[hidden] { display: none; }
+.serbest input { margin: 0; accent-color: var(--vurgu); cursor: pointer; }
+.serbest:has(input:checked) { color: var(--vurgu); font-weight: 500; }
 .gonder { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--metin); color: var(--zemin); display: grid; place-items: center; }
 .gonder:disabled { opacity: .25; cursor: default; }
 .gonder svg { width: 18px; height: 18px; stroke-width: 2.2; }
@@ -362,6 +366,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 
 @media (max-width: 860px) {
   .mod-sec button { padding: 5px 9px; font-size: 13px; gap: 4px; }
+  .kutu-alt { flex-wrap: wrap; }
   .uygulama, .uygulama.kapali { grid-template-columns: minmax(0, 1fr); }
   .kenar { position: fixed; inset: 0 auto 0 0; width: 284px; z-index: 30; transform: translateX(-100%); transition: transform .2s; visibility: visible !important; }
   .uygulama.mobil-menu .kenar { transform: none; box-shadow: var(--golge); }
@@ -461,6 +466,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
             <button type="button" data-mod="derin" title="Alt sorulara böler, onlarca kaynak okur, rapor yazar"><svg class="ik"><use href="#i-mercek"/></svg>Derin araştırma</button>
             <button type="button" data-mod="gorev" title="Chrome'unda senin için gezinir, bilgi toplar, form doldurur"><svg class="ik"><use href="#i-imlec"/></svg>Görev</button>
           </div>
+          <label class="serbest" id="serbest-kutu" hidden title="İşaretlersen Sonda gönder, başvur, onayla, sil, giriş gibi butonlara seni beklemeden kendisi basar. Ödeme, satın alma, abonelik, para gönderme ve hesap silme yine sende kalır; kart ve şifre alanlarına yine yazmaz."><input type="checkbox" id="serbest">Butonlara kendisi bassın</label>
           <button class="gonder" id="gonder" type="submit" aria-label="Gönder" disabled><svg class="ik"><use href="#i-yukari"/></svg></button>
         </div>
       </form>
@@ -543,6 +549,7 @@ $("#model").onchange = e => { depo.yaz("sonda-model", e.target.value); rozetGunc
 function modSec(m) {
   S.mod = m; depo.yaz("sonda-mod", m);
   document.querySelectorAll(".mod-sec button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mod === m));
+  $("#serbest-kutu").hidden = m !== "gorev";
   alan.placeholder = { derin: "Derinlemesine araştırılacak konuyu yaz", gorev: "Chrome'da yapılacak görevi yaz (ör. iki sitede fiyat karşılaştır)" }[m] || "Sonda'ya bir şey sor";
 }
 document.querySelectorAll(".mod-sec button").forEach(b => b.onclick = () => { modSec(b.dataset.mod); alan.focus(); });
@@ -890,7 +897,8 @@ async function gonder() {
   try {
     const yanit = await fetch("/api/sor", {
       method: "POST", headers: { "Content-Type": "application/json" }, signal: S.iptal.signal,
-      body: JSON.stringify({ soru, gecmis, model, mod: S.mod, onceki_kaynaklar, diger_sohbetler }),
+      body: JSON.stringify({ soru, gecmis, model, mod: S.mod, onceki_kaynaklar, diger_sohbetler,
+                             serbest: S.mod === "gorev" && $("#serbest").checked }),
     });
     if (!yanit.ok) throw new Error(`Sunucu ${yanit.status} döndürdü`);
     const okuyucu = yanit.body.getReader(); const coz = new TextDecoder(); let tampon = "";

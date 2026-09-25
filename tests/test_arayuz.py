@@ -11,10 +11,12 @@ import uvicorn
 from sonda import asistan, gorev, sunucu
 
 KOMUTLAR = []
+SERBESTLER = []  # her isteğin "butonlara kendisi bassın" değeri
 
 
 def _sahte_akis(senaryo):
     def calistir(soru, gecmis, model, mod, *a, **k):
+        SERBESTLER.append(k.get("serbest"))
         yield from senaryo(soru)
     return calistir
 
@@ -167,4 +169,19 @@ def test_bulut_model_secilince_gizlilik_rozeti_degisir(arayuz):
     s.select_option("#model", yerel)
     assert "Model bu bilgisayarda çalışır" in s.inner_text(".yerel-rozet")
     s.click("[data-gemini-sil]")
+    s.close()
+
+
+def test_serbest_kutucugu_yalniz_gorevde_gorunur_ve_istekle_gider(arayuz):
+    s = _sayfa(arayuz)
+    assert s.is_visible("#serbest") and not s.is_checked("#serbest")
+    _gonder(s, "fiyat karşılaştır")
+    s.wait_for_selector(".durum-satiri.tamam")
+    assert SERBESTLER[-1] is False
+    s.check("#serbest")
+    _gonder(s, "fiyat karşılaştır yine")
+    s.wait_for_function("document.querySelectorAll('.durum-satiri.tamam').length === 2")
+    assert SERBESTLER[-1] is True
+    s.click("[data-mod=hizli]")
+    assert not s.is_visible("#serbest-kutu")
     s.close()

@@ -68,6 +68,29 @@ def test_yerel_sitede_gorev(model, yerel_tarayici_ac, site):
     assert "Kioxia" in cevap and ("2.649" in cevap or "2649" in cevap)
 
 
+def test_serbest_modda_formu_kendisi_gonderir(model, yerel_tarayici_ac, site):
+    """Kullanıcı "butonlara kendisi bassın" izni verdi: Sonda formu doldurup Gönder'e kendisi basmalı."""
+    from conftest import ihlaller
+    kayit = {}
+
+    def ac():
+        t = kayit["t"] = yerel_tarayici_ac()
+        t._kapat_asil, t._kapat = t._kapat, None  # ihlal kaydını okumak için açık kalsın
+        return t
+    metin = (f"{site}/basvuru.html formunu doldur ve gönder: Ad Soyad Semih Tekay, e-posta semih@ornek.com, "
+             "şehir İzmir, ön yazı 'Stajınıza başvurmak istiyorum.', KVKK kutusunu işaretle.")
+    olaylar = []
+    for o in gorev.calistir(metin, model, tarayici_ac=ac, serbest=True):
+        olaylar.append(o)
+        if o["tur"] == "kullaniciya":
+            gorev.komut_ver(o["id"], "durdur")
+    kayitlar = gorev.tarayici_isinde(ihlaller, kayit["t"])
+    gorev.tarayici_isinde(kayit["t"]._kapat_asil)
+    print(f"\n{model}: {[o.get('metin') for o in olaylar if o['tur'] in ('adim', 'kullaniciya')]}")
+    assert not any(o["tur"] == "kullaniciya" for o in olaylar)
+    assert any(i["tur"] == "gonderme" for i in kayitlar)
+
+
 def test_derin_arastirma(model, monkeypatch):
     """Gerçek hata: derin moddaki sistem-yalnız çağrılar Gemini'de 'contents are required' veriyordu."""
     from sonda import asistan

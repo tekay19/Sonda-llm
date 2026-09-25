@@ -7,6 +7,11 @@ basılmaz. Bunlar kullanıcıya bırakılır. Kurallar temkinlidir: şüpheli du
 Tek istisna (kullanıcı kararı): kullanıcı görev mesajında bir sitenin şifresini açıkça verdiyse, o şifre ve yalnızca
 o şifre, yalnızca görevde adı geçen sitede şifre alanına yazılabilir ve giriş butonuna basılabilir. Kart, CVV, IBAN
 ve doğrulama kodları görevde verilse bile kullanıcıya kalır.
+
+Serbest mod (kullanıcı görevi başlatmadan önce kutucuğu işaretlerse): gönder, başvur, onayla, sil, giriş gibi son adım
+butonlarına Sonda kendisi basar. Para harcatan butonlar (öde, satın al, sipariş, abonelik, havale, işe al), hesap silme,
+ödeme sayfasındaki "Devam" ve kart/şifre içeren formları gönderme yine kullanıcıya kalır; hassas alanlara yazma kuralı
+değişmez.
 """
 import base64
 import re
@@ -30,6 +35,15 @@ _YASAK_BUTON = re.compile(
     r"|\bsiparis\w* (ver|onayla|tamamla)|place (your )?order|\b(complete|confirm|submit) (my |your )?(order|purchase|booking|payment)"
     r"|\border now\b|\bbook now\b|rezervasyon\w* (yap|tamamla|onayla)|\bodeme\w* (devam|gec)|teklif\w* kabul"
     r"|accept (the )?offer|\bhire\b|\bise al|\bbagis|donate|transfer et|havale|\beft\b|para gonder|send money")
+# Serbest modda da kullanıcıya kalan butonlar: para harcatır ya da hesabı geri dönülmez şekilde kapatır
+_PARA_BUTON = re.compile(
+    r"\bode\b|\bodeme(yi)? (yap|tamamla|onayla)|\bodemeye gec|satin al|hemen al|simdi al|alisverisi tamamla"
+    r"|\bsiparis\w* (ver|onayla|tamamla)|hesab\w* (kapat|sil)|abone ol|subscribe"
+    r"|\bpay\b|\bbuy\b|purchase|place (your )?order|\bcheck ?out\b|\border now\b|\bbook now\b"
+    r"|\b(complete|confirm|submit) (my |your )?(order|purchase|booking|payment)"
+    r"|(delete|close|deactivate) (my |your |the )?account|rezervasyon\w* (yap|tamamla|onayla)|\bodeme\w* (devam|gec)"
+    r"|teklif\w* kabul|accept (the )?offer|\bhire\b|\bise al|\bbagis|donate|transfer et|havale|\beft\b"
+    r"|para gonder|send money")
 # Ödeme/sipariş sayfalarında "Devam/Continue" da son adım olabilir (kayıtlı kartla tek tık sipariş)
 _ODEME_ADRESI = re.compile(r"checkout|/odeme|/payment|/buy/|/siparis|place-?order|/sepet/onay|/cart/confirm", re.I)
 _DEVAM = re.compile(r"(devam( et)?|continue|ileri|next|proceed( to [a-z ]+)?)")
@@ -95,6 +109,10 @@ def hassas_alan(oge):
 
 def yasak_buton(oge):
     return bool(_YASAK_BUTON.search(sade(" ".join(str(oge.get(k) or "") for k in ("metin", "deger", "aria", "baslik")))))
+
+
+def para_butonu(oge):
+    return bool(_PARA_BUTON.search(sade(" ".join(str(oge.get(k) or "") for k in ("metin", "deger", "aria", "baslik")))))
 
 
 def _kayitli_alan(host):
@@ -237,7 +255,8 @@ def _submit_mu(oge):
            (oge.get("etiket") == "input" and oge.get("tip") in ("submit", "image"))
 
 
-def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=()):
+def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=(), serbest=False):
+    """serbest: kullanıcı bu görev için son adım butonlarına basma izni verdi (para ve hesap silme hariç)."""
     ad = eylem.get("eylem")
     gizli = set(gizliler) | gizli_adaylar(gorev_metni)
     if ad == "git":
@@ -262,7 +281,7 @@ def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=(
         metin = sade(" ".join(str(oge.get(k) or "") for k in ("metin", "deger", "aria", "baslik")))
         if kimlik and _GIRIS_BUTONU.search(metin) and not _YASAK_BUTON.search(_GIRIS_BUTONU.sub(" ", metin)):
             return Karar(True)
-        if yasak_buton(oge):
+        if para_butonu(oge) or (yasak_buton(oge) and not serbest):
             return Karar(False, f"🔒 “{oge_adi(oge)}” son adım butonu. Kontrol edip buna sen basmalısın.")
         if _ODEME_ADRESI.search(url or "") and (_submit_mu(oge) or _DEVAM.fullmatch(sade(oge_adi(oge)))):
             return Karar(False, f"🔒 Ödeme sayfasında “{oge_adi(oge)}” siparişi tamamlayabilir. Bu adım senin.")

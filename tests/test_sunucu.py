@@ -16,8 +16,8 @@ def test_gecersiz_komut_400():
 def test_calistir_gorev_moduna_yonlendirir(monkeypatch):
     cagri = {}
 
-    def sahte(soru, model, gecmis=()):
-        cagri.update(soru=soru, model=model, gecmis=list(gecmis))
+    def sahte(soru, model, gecmis=(), serbest=False):
+        cagri.update(soru=soru, model=model, gecmis=list(gecmis), serbest=serbest)
         yield {"tur": "gorev_basladi", "id": "x"}
         yield {"tur": "token", "metin": "tamam"}
         yield {"tur": "cevap_bitti", "metin": "tamam"}
@@ -25,7 +25,7 @@ def test_calistir_gorev_moduna_yonlendirir(monkeypatch):
     monkeypatch.setattr(asistan, "hafizayi_guncelle", lambda *a: None)
     monkeypatch.setattr(asistan, "yon_belirle", lambda *a: "gorev")
     olaylar = list(asistan.calistir("ssd bul", [{"role": "user", "content": "a"}], "m", "gorev"))
-    assert cagri["soru"] == "ssd bul" and cagri["gecmis"]
+    assert cagri["soru"] == "ssd bul" and cagri["gecmis"] and cagri["serbest"] is False
     assert [o["tur"] for o in olaylar] == ["yon", "gorev_basladi", "token", "bitti"]  # görevde öneri üretilmez
 
 
@@ -231,3 +231,15 @@ def test_onceki_mesajdaki_sifre_tekrarlaninca_gizlenir(monkeypatch):
     list(asistan.calistir("Aynı hesapla Kedi-1234 kullanarak twitter.com'a da gir",
                           [{"role": "user", "content": "instagram şifrem Kedi-1234"}], "gemini:x", "gorev"))
     assert gorulen and "Kedi-1234" not in repr(gorulen)
+
+
+def test_serbest_izni_istekten_goreve_gecer(monkeypatch):
+    cagri = {}
+
+    def sahte(soru, model, gecmis=(), serbest=False):
+        cagri["serbest"] = serbest
+        yield {"tur": "cevap_bitti", "metin": ""}
+    monkeypatch.setattr(gorev, "calistir", sahte)
+    monkeypatch.setattr(asistan, "yon_belirle", lambda *a: "gorev")
+    istemci.post("/api/sor", json={"soru": "başvur", "model": "m", "mod": "gorev", "serbest": True}).read()
+    assert cagri["serbest"] is True

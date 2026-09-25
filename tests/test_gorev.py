@@ -6,6 +6,7 @@ from sonda import gorev
 from sonda.model import Parca, Yanit
 
 ORIJINAL_SONUC_YAZ = gorev.dongu.sonuc_yaz
+ORIJINAL_KARAR_AL = gorev.karar.karar_al
 from conftest import ihlaller
 
 DERINLIK = {"derinlik": "basit", "min_site": 1, "maks_adim": 40, "plan": []}
@@ -18,7 +19,8 @@ class SahteModel:
     def __init__(self, eylemler):
         self.eylemler, self.istemler, self.ekranlar, self.dusunceler = list(eylemler), [], [], []
 
-    def __call__(self, model, istem, ekran=None, dusun=False):
+    def __call__(self, model, istem, ekran=None, dusun=False, serbest=False):
+        self.serbest = serbest
         self.istemler.append(istem)
         self.ekranlar.append(ekran)
         self.dusunceler.append(dusun)
@@ -45,7 +47,7 @@ def sahte(monkeypatch):
     return kur
 
 
-def calistir(yerel_tarayici_ac, metin="görev", komutlar=None, kayit=None):
+def calistir(yerel_tarayici_ac, metin="görev", komutlar=None, kayit=None, serbest=False):
     """Görevi çalıştırır; 'kullaniciya' olayı gelince sıradaki komutu verir. Olay listesini döner.
     kayit verilirse Tarayici nesnesi kayit["t"]'ye konur (ihlal kontrolü için)."""
     komutlar = list(komutlar or [])
@@ -57,7 +59,7 @@ def calistir(yerel_tarayici_ac, metin="görev", komutlar=None, kayit=None):
             t._kapat_asil, t._kapat = t._kapat, None  # testte ihlalleri okuyabilmek için açık bırak
         return t
     olaylar = []
-    for o in gorev.calistir(metin, "sahte", tarayici_ac=ac):
+    for o in gorev.calistir(metin, "sahte", tarayici_ac=ac, serbest=serbest):
         olaylar.append(o)
         if o["tur"] == "kullaniciya":
             gorev.komut_ver(o["id"], komutlar.pop(0) if komutlar else "durdur")
@@ -88,7 +90,7 @@ def test_yasak_buton_engellenir_ve_kullaniciya_birakilir(sahte, yerel_tarayici_a
     m = sahte(adimlar())
     # tıklanacak numarayı bilmediğimizden ikinci eylemi istem geldiğinde belirle
     asil = m.__call__
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         karar = asil(model, istem, ekran, dusun)
         if karar.get("eylem") == "tikla":
             satir = next(s for s in istem.splitlines() if "Giriş Yap" in s and s.startswith("["))
@@ -106,7 +108,7 @@ def test_hassas_alana_yazma_engellenir(sahte, yerel_tarayici_ac, site):
     kayit = {}
     m = sahte([{"eylem": "git", "url": f"{site}/magaza/odeme.html"}])
     asil = m.__call__
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             satir = next(s for s in istem.splitlines() if "Kart Numarası" in s and s.startswith("["))
             m.istemler.append(istem)
@@ -186,7 +188,7 @@ def test_koruma_taze_oge_bilgisini_kullanir(sahte, yerel_tarayici_ac, site):
     kayit = {}
     m = sahte([{"eylem": "git", "url": f"{site}/magaza/urun.html?id=2"}])
     asil = m.__call__
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(s for s in istem.splitlines() if "Sepete Ekle" in s and s.startswith("["))
@@ -264,7 +266,7 @@ def test_sekme_kapaninca_gorev_ozetle_biter(sahte, yerel_tarayici_ac, site):
     kayit = {}
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "kaydir", "yon": "asagi"}])
     asil = m.__call__
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         karar = asil(model, istem, ekran, dusun)
         if karar["eylem"] == "kaydir":
             kayit["t"].sayfa.close()  # kullanıcı sekmeyi kapattı
@@ -425,7 +427,7 @@ def test_gorevde_verilen_sifre_girilir_ve_gizlenir(sahte, yerel_tarayici_ac, sit
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if "Şifre" in x and x.startswith("["))
@@ -508,7 +510,7 @@ def test_giris_bilgisi_verilmeyen_gorevde_giris_kullaniciya_kalir(sahte, yerel_t
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if "Giriş Yap" in x and x.startswith("["))
@@ -566,7 +568,7 @@ def test_istenen_form_alani_eksikken_devretme_reddedilir(sahte, yerel_tarayici_a
     m = sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}, {"eylem": "sana_birak", "sebep": "bitti"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if "Ad Soyad" in x and x.startswith("["))
@@ -638,7 +640,7 @@ def test_sekme_kapaninca_bitis_durumu(sahte, yerel_tarayici_ac, site):
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "kaydir"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         karar = asil(model, istem, ekran, dusun)
         if karar["eylem"] == "kaydir":
             kayit["t"].sayfa.close()
@@ -660,7 +662,7 @@ def test_tiklama_engeli_modele_neden_olarak_doner(sahte, yerel_tarayici_ac, site
     m = sahte([{"eylem": "git", "url": f"{site}/engel.html"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if "Devam et" in x and x.startswith("["))
@@ -947,7 +949,7 @@ def test_karar_sirasinda_durdurulursa_eylem_uygulanmaz(sahte, yerel_tarayici_ac,
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             for g in list(gorev.GOREVLER.values()):
@@ -1013,7 +1015,7 @@ def test_yazinca_uzunluk_geri_bildirilir(sahte, yerel_tarayici_ac, site):
     m = sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}])
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if "Ön yazı" in x and x.startswith("["))
@@ -1076,7 +1078,7 @@ def test_gorevde_model_hatasi_notlari_korur(sahte, yerel_tarayici_ac, site, monk
     m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "Giriş formu var"}])
     asil = m.__call__
 
-    def kota(model, istem, ekran=None, dusun=False):
+    def kota(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 2:
             raise ModelHatasi("Gemini istek sınırı/kotası doldu; biraz bekle ya da yerel modele geç.")
         return asil(model, istem, ekran, dusun)
@@ -1112,7 +1114,7 @@ def _alana_yaz(m, etiket, deger):
     """İlk adımdan sonra etiketi geçen alana verilen değeri yazan sahte karar."""
     asil = m.__call__
 
-    def akilli(model, istem, ekran=None, dusun=False):
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
         if len(m.istemler) == 1:
             m.istemler.append(istem)
             satir = next(x for x in istem.splitlines() if etiket in x and x.startswith("["))
@@ -1196,3 +1198,52 @@ def test_sayfadaki_sifre_istemde_gizlenir(sahte, yerel_tarayici_ac, site, monkey
 def test_sonuc_promptu_genel_bilgiye_kaynak_numarasi_koydurmaz():
     s = gorev.promptlar.SONUC_PROMPTU.lower()
     assert "genel bilgi" in s and "numara koyma" in s
+
+
+def _tikla_metin(m, metin):
+    """Sahte modelin 'tikla' eylemine, istemde verilen metinli öğenin numarasını koyar."""
+    asil = m.__call__
+    def akilli(model, istem, ekran=None, dusun=False, serbest=False):
+        karar = asil(model, istem, ekran, dusun, serbest)
+        if karar.get("eylem") == "tikla":
+            satir = next(s for s in istem.splitlines() if metin in s and s.startswith("["))
+            karar["no"] = int(satir[1:satir.index("]")])
+        return karar
+    gorev.karar.karar_al = akilli
+
+
+def test_serbest_modda_gonder_butonuna_kendisi_basar(sahte, yerel_tarayici_ac, site):
+    kayit = {}
+    m = sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}, {"eylem": "tikla", "no": None},
+               {"eylem": "bitir", "sonuc": "gönderildi"}])
+    _tikla_metin(m, "Başvuruyu Gönder")
+    o = calistir(yerel_tarayici_ac, kayit=kayit, serbest=True)
+    assert m.serbest is True
+    assert "kullaniciya" not in turler(o)
+    assert not any(x["tur"] == "adim" and x["tip"] == "engel" for x in o)
+    assert [i["tur"] for i in isinde(ihlaller, kayit["t"])] == ["tiklama", "gonderme"]  # gerçekten bastı
+    isinde(kayit["t"]._kapat_asil)
+
+
+def test_serbest_modda_satin_al_yine_kullaniciya_kalir(sahte, yerel_tarayici_ac, site):
+    kayit = {}
+    m = sahte([{"eylem": "git", "url": f"{site}/magaza/urun.html"}, {"eylem": "tikla", "no": None}])
+    _tikla_metin(m, "Hemen Al")
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"], kayit=kayit, serbest=True)
+    assert "kullaniciya" in turler(o)
+    assert any(x["tur"] == "adim" and x["tip"] == "engel" for x in o)
+    assert isinde(ihlaller, kayit["t"]) == []
+    isinde(kayit["t"]._kapat_asil)
+
+
+def test_serbest_kurali_sistem_istemine_girer(monkeypatch):
+    sistemler = []
+    def sohbet(model, mesajlar, **k):
+        sistemler.append(mesajlar[0]["content"])
+        return Yanit(metin='{"eylem": "bitir", "sonuc": "tamam"}')
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", sohbet)
+    ORIJINAL_KARAR_AL("m", "istem")
+    ORIJINAL_KARAR_AL("m", "istem", serbest=True)
+    assert "ASLA basma" in sistemler[0] and "izni verdi" not in sistemler[0]
+    assert "butonlara basma izni verdi" in sistemler[1] and "ASLA basma" not in sistemler[1]
+    assert "Ödeme, satın alma, sipariş" in sistemler[1]

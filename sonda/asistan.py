@@ -63,7 +63,7 @@ def baslik_uret(model, soru):
     return baslik[:60] or soru[:60]
 
 
-def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), oneri=True):
+def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), oneri=True, serbest=False):
     basla = time.time()
     cevap = ""
     gizliler = set().union(koruma.gizli_adaylar(soru), *(koruma.gizli_adaylar(m["content"]) for m in gecmis),
@@ -78,7 +78,7 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
             yield {"tur": "yon", "hedef": hedef}
             oneri = False
             if hedef == "gorev":
-                uretec = gorev.calistir(soru, model, gecmis)  # görev şifreyi yer tutucuyla kendisi korur
+                uretec = gorev.calistir(soru, model, gecmis, serbest=serbest)  # görev şifreyi yer tutucuyla kendisi korur
             elif hedef == "sohbet":
                 uretec = sohbet(temiz_soru, temiz_gecmis, model, onceki_kaynaklar, diger_sohbetler)
             else:

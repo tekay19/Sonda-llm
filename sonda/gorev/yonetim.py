@@ -76,7 +76,7 @@ def komut_ver(gorev_id, komut):
     return True
 
 
-def calistir(gorev_metni, model, gecmis=(), tarayici_ac=None):
+def calistir(gorev_metni, model, gecmis=(), tarayici_ac=None, serbest=False):
     onceki_suruyor = bool(GOREVLER)
     g = Gorev()
     GOREVLER[g.id] = g
@@ -85,7 +85,7 @@ def calistir(gorev_metni, model, gecmis=(), tarayici_ac=None):
 
     def isci():
         try:
-            for olay in dongu.yurut(g, gorev_metni, onceki, model, tarayici_ac or tarayici.baglan):
+            for olay in dongu.yurut(g, gorev_metni, onceki, model, tarayici_ac or tarayici.baglan, serbest):
                 kuyruk.put(olay)
         except Exception as h:
             kuyruk.put({"tur": "hata", "metin": f"{type(h).__name__}: {h}"})

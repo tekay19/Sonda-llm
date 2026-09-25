@@ -154,7 +154,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         istem_metni = koruma.gizle(istem(model_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa, geri_bildirim,
                                          adim_no, maks), sifreler)
         dusun = dusunmeli(derinlik, adim_no, geri_bildirim)
-        karar = kararlar.karar_al(model, istem_metni, ekran, dusun)
+        karar = kararlar.karar_al(model, istem_metni, ekran, dusun, serbest=durum.get("serbest", False))
         kayit.yaz({"adim": adim_no, "zaman": time.strftime("%H:%M:%S"), "url": sayfa["url"], "dusun": dusun,
                    "ekran": ekran is not None, "istem": istem_metni, "karar": karar})
         if g.durdu.is_set():  # model düşünürken Durdur'a basıldı: gelen eylem uygulanmaz
@@ -245,7 +245,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                     continue
             oge = bilgi["oge"]
             k = koruma.kontrol(karar, oge, bilgi["form_ogeleri"], gorev_metni=gorev_metni, url=t.url,
-                               gizliler=durum["gizli"])
+                               gizliler=durum["gizli"], serbest=durum.get("serbest", False))
             if not k.izin:
                 t.vurgula(no)
                 yield adim("engel", k.sebep)
@@ -377,7 +377,7 @@ def sonuc_yaz(model, gorev_metni, durum):
     yield {"tur": "cevap_bitti", "metin": cevap}
 
 
-def yurut(g, gorev_metni, onceki, model, tarayici_ac):
+def yurut(g, gorev_metni, onceki, model, tarayici_ac, serbest=False):
     # Önceki mesajlarda verilmiş şifreler de korunur ve istemlere/kayıtlara açık yazılmaz
     onceki_gizli = koruma.gizli_adaylar(onceki)
     onceki = koruma.gizle(onceki, onceki_gizli)
@@ -395,7 +395,7 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
                     f"en fazla {derinlik['maks_adim']} adım"}
     gizliler = set()
     durum = {"notlar": [], "adimlar": GizliListe(gizliler), "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": gizliler,
-             "derinlik": derinlik}
+             "derinlik": derinlik, "serbest": serbest}
     durum["gizli"].update(onceki_gizli)
     durum["onceki_gizli"] = onceki_gizli
     try:

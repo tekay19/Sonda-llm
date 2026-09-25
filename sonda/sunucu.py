@@ -35,6 +35,7 @@ class Istek(BaseModel):
     mod: str = "hizli"
     onceki_kaynaklar: list[dict] = []   # son cevabın kaynakları (takip soruları için)
     diger_sohbetler: list[str] = []     # diğer sohbetlerin başlıkları
+    serbest: bool = False               # görev: son adım butonlarına Sonda kendisi basabilir (para hariç)
 
 
 @app.get("/")
@@ -139,7 +140,7 @@ def sor(istek: Istek):
 
     def olaylar():
         for olay in calistir(istek.soru, gecmis, istek.model, istek.mod,
-                             istek.onceki_kaynaklar, istek.diger_sohbetler):
+                             istek.onceki_kaynaklar, istek.diger_sohbetler, serbest=istek.serbest):
             yield f"data: {json.dumps(olay, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(olaylar(), media_type="text/event-stream",

@@ -5,7 +5,7 @@ from .. import hafiza
 from .. import model as saglayici
 from ..ortak import JSON_SECENEKLERI, bugun
 from . import ayar
-from .promptlar import DEGERLENDIRME_PROMPTU, DERINLIK_PROMPTU, SISTEM
+from .promptlar import BUTON_KURALI, BUTON_KURALI_SERBEST, DEGERLENDIRME_PROMPTU, DERINLIK_PROMPTU, SISTEM
 
 
 def dogrula(veri):
@@ -23,9 +23,11 @@ def dogrula(veri):
     return None
 
 
-def karar_al(model, istem, ekran=None, dusun=False):
-    """Tek eylem kararı. dusun=True: model önce adım adım düşünür (daha yavaş, daha isabetli)."""
-    sistem = SISTEM.format(tarih=bugun(), hafiza=f"\n\n{h}" if (h := hafiza.istem_metni()) else "")
+def karar_al(model, istem, ekran=None, dusun=False, serbest=False):
+    """Tek eylem kararı. dusun=True: model önce adım adım düşünür (daha yavaş, daha isabetli).
+    serbest=True: kullanıcı son adım butonlarına basma izni verdi."""
+    sistem = SISTEM.format(tarih=bugun(), hafiza=f"\n\n{h}" if (h := hafiza.istem_metni()) else "",
+                           buton_kurali=BUTON_KURALI_SERBEST if serbest else BUTON_KURALI)
     ek = ""
     for _ in range(2):
         mesaj = {"role": "user", "content": istem + ek}
