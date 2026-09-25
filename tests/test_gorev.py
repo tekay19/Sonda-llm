@@ -435,3 +435,84 @@ def test_gorevde_verilen_sifre_girilir_ve_gizlenir(sahte, yerel_tarayici_ac, sit
     assert not any("Parola-7788" in str(x.get("metin", "")) for x in o)
     assert "Parola-7788" not in "\n".join(m.istemler[2:]).split("GÖREV:")[-1].split("\n\n", 1)[1]
     isinde(kayit["t"]._kapat_asil)
+
+
+def _sayfa_ogeli(ogeler, metin=""):
+    return {"url": "https://x.com/a", "baslik": "B", "ogeler": ogeler, "metin": metin}
+
+
+def _girdi(**k):
+    o = {"no": 1, "etiket": "input", "rol": "", "tip": "text", "ad": "", "kimlik": "", "otomatik": "", "yer": "",
+         "aria": "", "baslik": "", "metin": "", "deger": "", "href": "", "form": 0, "form_eylem": "", "ekranda": True}
+    o.update(k)
+    return o
+
+
+@pytest.mark.parametrize("sayfa", [
+    _sayfa_ogeli([_girdi(otomatik="one-time-code")]),
+    _sayfa_ogeli([_girdi(metin="Verification code")], "We sent a code to your phone"),
+    _sayfa_ogeli([_girdi(ad="otp")], "2-Step Verification"),
+    _sayfa_ogeli([_girdi(metin="Doğrulama kodu")], "Telefonunuza gönderilen doğrulama kodunu girin"),
+    _sayfa_ogeli([_girdi(yer="6 haneli kod", tip="tel")], "İki adımlı doğrulama"),
+])
+def test_iki_adimli_dogrulama_sayfasi_taninir(sayfa):
+    assert gorev.iki_adim_mi(sayfa)
+
+
+@pytest.mark.parametrize("sayfa", [
+    _sayfa_ogeli([_girdi(tip="password", metin="Şifre"), _girdi(tip="email", metin="E-posta")], "Giriş yap"),
+    _sayfa_ogeli([_girdi(tip="search", ad="q")], "Two-factor authentication explained: how 2FA protects accounts"),
+    _sayfa_ogeli([], "Enable two-factor authentication in settings"),
+])
+def test_iki_adim_olmayan_sayfa(sayfa):
+    assert not gorev.iki_adim_mi(sayfa)
+
+
+def test_iki_adimli_dogrulamada_durur_ve_kendiliginden_devam_eder(sahte, yerel_tarayici_ac, site, monkeypatch):
+    """Kullanıcı isteği: 2FA isteyen yerde dur; kullanıcı doğrulamayı yapınca 'Devam' beklemeden sürdür."""
+    monkeypatch.setattr(gorev, "IKI_ADIM_KONTROL", 0.3)
+    m = sahte([{"eylem": "git", "url": f"{site}/iki_adim.html?bekle=2000"},
+               {"eylem": "bitir", "sonuc": "x"}])
+    olaylar = list(gorev.calistir("upwork'e gir", "sahte", tarayici_ac=yerel_tarayici_ac))  # hiç komut verilmez
+    kul = [o for o in olaylar if o["tur"] == "kullaniciya"]
+    assert len(kul) == 1 and "2FA" in kul[0]["sebep"]
+    assert {"tur": "devam_edildi", "komut": "otomatik"} in olaylar
+    assert "magaza/index.html" in m.istemler[1]  # doğrulamadan sonraki ilk istem
+    assert "doğrulamayı tamamladı" in m.istemler[1]
+
+
+def test_iki_adimda_devam_komutu_da_calisir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    monkeypatch.setattr(gorev, "IKI_ADIM_KONTROL", 0.3)
+    sahte([{"eylem": "git", "url": f"{site}/iki_adim.html"}, {"eylem": "bitir", "sonuc": "x"}])
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
+    assert {"tur": "devam_edildi", "komut": "durdur"} in o
+
+
+def test_iki_adim_kod_alanina_yazilamaz():
+    import koruma
+    assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "123456"}, _girdi(otomatik="one-time-code"),
+                              gorev_metni="upwork şifrem abc12345 kod 123456", url="https://upwork.com").izin
+
+
+def test_sistem_promptu_once_mevcut_oturumu_kullanir():
+    """Kullanıcı isteği: önce tarayıcıdaki mevcut oturum; giriş bilgisi verilmediyse giriş yapma."""
+    p = gorev.SISTEM.lower()
+    assert "mevcut oturum" in p and "zaten giriş" in p
+
+
+def test_giris_bilgisi_verilmeyen_gorevde_giris_kullaniciya_kalir(sahte, yerel_tarayici_ac, site):
+    kayit = {}
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            satir = next(x for x in istem.splitlines() if "Giriş Yap" in x and x.startswith("["))
+            return {"eylem": "tikla", "no": int(satir[1:satir.index("]")])}
+        return asil(model, istem, ekran)
+    gorev._karar_al = akilli
+    o = calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sitesindeki hesabıma bak", komutlar=["durdur"], kayit=kayit)
+    assert "kullaniciya" in turler(o)
+    assert isinde(ihlaller, kayit["t"]) == []
+    isinde(kayit["t"]._kapat_asil)

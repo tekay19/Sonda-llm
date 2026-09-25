@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>2-Step Verification</title>
+<script src="ortak.js"></script>
+<h1>2-Step Verification</h1>
+<p>We sent a 6-digit verification code to your phone ending in 42. Enter the code to continue.</p>
+<form id="dogrula" data-yasak>
+  <label>Verification code <input name="code" autocomplete="one-time-code" data-hassas></label>
+  <button data-yasak>Verify</button>
+</form>
+<script>
+// Test: kullanıcının telefondan doğrulamayı tamamlamasını taklit eder
+const bekle = new URLSearchParams(location.search).get("bekle");
+if (bekle) setTimeout(() => { location.href = "magaza/index.html"; }, Number(bekle));
+</script></html>
