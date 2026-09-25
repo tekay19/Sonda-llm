@@ -15,6 +15,16 @@ from .promptlar import CAPTCHA_SEBEBI, DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TA
 from .sayfa import SayfaHafizasi, eksik_form_alanlari, iki_adim_mi
 
 
+_ZOR_DURUM = ("Eylem başarısız", "Henüz bitirme", "Önce", "🔒", "Geçersiz", "Yalnızca")
+
+
+def dusunmeli(derinlik, adim_no, geri_bildirim):
+    """Düşünme modu pahalıdır: bir şey ters gittiğinde ve derin görevlerde düzenli aralıklarla açılır."""
+    if geri_bildirim.startswith(_ZOR_DURUM) or "öğe yok" in geri_bildirim or "Dikkat:" in geri_bildirim:
+        return True
+    return derinlik["derinlik"] == "derin" and adim_no % ayar.DUSUNME_ARALIGI == 1
+
+
 def devret(g, sebep, otomatik=None):
     g.temizle()
     yield {"tur": "kullaniciya", "id": g.id, "sebep": sebep}
@@ -62,6 +72,17 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             yield {"tur": "anlatim", "metin": "Görev beklediğimden uzun sürüyor ama ilerliyor; devam ediyorum."}
         izler[adim_no] = ilerleme()
         adim_no += 1
+        if (derinlik["derinlik"] in ("orta", "derin") and adim_no > 1
+                and (adim_no - 1) % ayar.DEGERLENDIRME_ARALIGI == 0):
+            ara = kararlar.ilerleme_degerlendir(model, gorev_metni, derinlik, notlar, hafiza_)
+            if ara.get("plan"):
+                derinlik["plan"] = ara["plan"]
+            if ara.get("degerlendirme"):
+                metin = ara["degerlendirme"]
+                for gizli in koruma.gizli_adaylar(gorev_metni) | durum["gizli"]:
+                    metin = metin.replace(gizli, "•••")
+                yield {"tur": "anlatim", "metin": metin}
+                adimlar.append(f"{adim_no}. ara değerlendirme: {metin[:150]}")
         if g.durdu.is_set():
             durum["kod"], durum["hal"] = "durduruldu", "Kullanıcı görevi durdurdu."
             return
@@ -80,7 +101,8 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         hafiza_.goruldu(sayfa)
         ekran_iste = False
         karar = kararlar.karar_al(model, istem(gorev_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa,
-                                        geri_bildirim, adim_no, maks), ekran)
+                                                geri_bildirim, adim_no, maks), ekran,
+                                  dusunmeli(derinlik, adim_no, geri_bildirim))
         if karar is None:
             geri_bildirim = "Geçersiz cevap verdin; listedeki eylemlerden birini geçerli JSON olarak döndür."
             adimlar.append(f"{adim_no}. (geçersiz cevap)")
@@ -242,7 +264,9 @@ def sonuc_yaz(model, gorev_metni, durum):
                                  icerik=durum["hafiza"].icerik(ayar.SONUC_ICERIK),
                                  adimlar="\n".join(durum["adimlar"][-15:]) or "(yok)")
     cevap = ""
-    for parca in ollama.chat(model=model, stream=True, think=False, options=SECENEKLER,
+    derinlik = durum.get("derinlik") or {}
+    dusun = bool(derinlik.get("inceleme") or derinlik.get("derinlik") == "derin")  # analizde önce düşün
+    for parca in ollama.chat(model=model, stream=True, think=dusun, options=SECENEKLER,
                              messages=[{"role": "user", "content": istem}]):
         if parca.message.content:
             cevap += parca.message.content
@@ -262,7 +286,8 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
     yield {"tur": "adim", "tip": "plan", "detay": derinlik["plan"],
            "metin": f"{derinlik['derinlik'].capitalize()} görev: en az {derinlik['min_site']} site, "
                     f"en fazla {derinlik['maks_adim']} adım"}
-    durum = {"notlar": [], "adimlar": [], "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": set()}
+    durum = {"notlar": [], "adimlar": [], "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": set(),
+             "derinlik": derinlik}
     try:
         yield from dongu(g, gorev_metni, onceki, model, t, durum, derinlik)
     except tarayici.SekmeKapandi:

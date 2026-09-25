@@ -39,6 +39,8 @@ IKI_ADIM_KONTROL = 2  # saniye: kullanıcı doğrulamayı bitirdi mi diye sayfay
 
 SAYFA_METNI = 8000  # sayfa başına biriktirilen görülen metin (karakter)
 SONUC_ICERIK = 15000  # son cevaba giden görülen içerik (karakter)
+DUSUNME_ARALIGI = 5  # derin görevde her 5 adımda bir düşünerek karar
+DEGERLENDIRME_ARALIGI = 10  # orta/derin görevde her 10 adımda ara değerlendirme ve plan güncelleme
 CAPTCHA_BEKLE = 3  # saniye: onay kutusundan sonra resimli bulmaca çıktı mı diye bekleme
 
 EYLEMLER = {"git": ["url"], "tikla": ["no"], "yaz": ["no", "metin"], "sec": ["no", "deger"], "kaydir": [],

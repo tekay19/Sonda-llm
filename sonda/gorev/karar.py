@@ -6,7 +6,7 @@ import ollama
 from .. import hafiza
 from ..ortak import JSON_SECENEKLERI, bugun
 from . import ayar
-from .promptlar import DERINLIK_PROMPTU, SISTEM
+from .promptlar import DEGERLENDIRME_PROMPTU, DERINLIK_PROMPTU, SISTEM
 
 
 def dogrula(veri):
@@ -24,14 +24,15 @@ def dogrula(veri):
     return None
 
 
-def karar_al(model, istem, ekran=None):
+def karar_al(model, istem, ekran=None, dusun=False):
+    """Tek eylem kararı. dusun=True: model önce adım adım düşünür (daha yavaş, daha isabetli)."""
     sistem = SISTEM.format(tarih=bugun(), hafiza=f"\n\n{h}" if (h := hafiza.istem_metni()) else "")
     ek = ""
     for _ in range(2):
         mesaj = {"role": "user", "content": istem + ek}
         if ekran:
             mesaj["images"] = [ekran]
-        yanit = ollama.chat(model=model, format="json", think=False, options=JSON_SECENEKLERI,
+        yanit = ollama.chat(model=model, format="json", think=dusun, options=JSON_SECENEKLERI,
                             messages=[{"role": "system", "content": sistem}, mesaj])
         try:
             veri = json.loads(yanit.message.content)
@@ -64,3 +65,24 @@ def derinlik_belirle(model, gorev_metni, onceki):
     plan = [a.strip() for a in plan if isinstance(a, str) and a.strip()][:6]
     return {"derinlik": derinlik, "min_site": max(1, min(5, min_site)), "inceleme": veri.get("inceleme") is True,
             "maks_adim": min(ayar.MAKS_ADIM, ayar.ADIM_SINIRI[derinlik]), "plan": plan}
+
+
+def ilerleme_degerlendir(model, gorev_metni, derinlik, notlar, hafiza_):
+    """Ara değerlendirme: model gidişatı düşünerek gözden geçirir ve kalan planı günceller. Hata olursa {}."""
+    plan = "\n".join(f"{i}. {a}" for i, a in enumerate(derinlik["plan"], 1)) or "(plan yok)"
+    icerik = (f"GÖREV: {gorev_metni}\n\nPLAN:\n{plan}\n\nNOTLAR:\n"
+              + ("\n".join(f"- {n['metin']}" for n in notlar) or "(yok)")
+              + f"\n\nZİYARET EDİLEN SAYFALAR:\n{hafiza_.metin()}")
+    try:
+        yanit = ollama.chat(model=model, format="json", think=True, options=JSON_SECENEKLERI, messages=[
+            {"role": "system", "content": DEGERLENDIRME_PROMPTU.format(tarih=bugun())},
+            {"role": "user", "content": icerik}])
+        veri = json.loads(yanit.message.content)
+    except Exception:
+        return {}
+    if not isinstance(veri, dict):
+        return {}
+    yeni = [a.strip() for a in veri.get("plan", []) if isinstance(a, str) and a.strip()][:6] \
+        if isinstance(veri.get("plan"), list) else []
+    degerlendirme = str(veri.get("degerlendirme") or "").strip()[:300]
+    return {"degerlendirme": degerlendirme, "plan": yeni} if (yeni or degerlendirme) else {}
