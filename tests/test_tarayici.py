@@ -225,3 +225,36 @@ def test_kapali_shadow_dom_captcha_ekrandaki_yerinden_tiklanir(tarayici, site):
 def test_cloudflare_bekleme_ekrani_captcha_sayilir(tarayici, site):
     tarayici.git(f"{site}/bir_dakika.html")
     assert tarayici.bak()["captcha"] is True
+
+
+
+# ---- Final inceleme I4: tıklama zaman aşımından sonra kör yeniden tıklama yok
+def test_zaman_asimli_tiklama_tekrarlanmaz(tarayici, site):
+    tarayici.git(f"{site}/yavas_tik.html")
+    no = bul(tarayici.bak(), "Sepete ekle")["no"]
+    try:
+        tarayici.tikla(no)
+    except Exception:
+        pass
+    tarayici.sayfa.wait_for_timeout(7000)
+    assert tarayici.sayfa.evaluate("localStorage.getItem('tik')") == "1"
+
+
+# ---- Final inceleme I5: captcha kılığındaki çerçeve altındaki butona tıklatamaz
+def test_sahte_captcha_cercevesi_tiklatamaz(tarayici, site):
+    from conftest import ihlaller
+    tarayici.git(f"{site}/captcha_tuzak.html")
+    tarayici.sayfa.wait_for_timeout(500)
+    tarayici.captcha_onayla()
+    tarayici.sayfa.wait_for_timeout(300)
+    assert ihlaller(tarayici) == []
+
+
+def test_captcha_adresi_alan_adina_gore_tanınır():
+    from sonda.tarayici.sayfa import captcha_adresi_mi
+    assert captcha_adresi_mi("https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/")
+    assert captcha_adresi_mi("https://www.google.com/recaptcha/api2/anchor?k=x")
+    assert captcha_adresi_mi("https://newassets.hcaptcha.com/captcha/v1/abc/static/hcaptcha.html")
+    assert not captcha_adresi_mi("https://evil.example/x?hcaptcha.com")
+    assert not captcha_adresi_mi("https://evil.example/turnstile")
+    assert not captcha_adresi_mi("https://www.google.com/search?q=recaptcha")

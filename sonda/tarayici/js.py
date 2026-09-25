@@ -71,8 +71,6 @@ ENGEL = """(e) => {
   return (kap.innerText || kap.getAttribute("aria-label") || kap.id || kap.tagName).replace(/\s+/g, " ").trim().slice(0, 120);
 }"""
 
-# Robot doğrulaması (captcha) çerçevelerinin adreslerinde geçen parçalar
-CAPTCHA_ADRESLERI = ("recaptcha/api2/anchor", "recaptcha/enterprise/anchor", "hcaptcha.com", "challenges.cloudflare.com", "turnstile")
 # Cloudflare bekleme ekranı başlıkları (onay kutusu henüz yüklenmemiş olabilir)
 CAPTCHA_BASLIKLARI = ("just a moment", "bir dakika", "checking your browser", "attention required")
 CAPTCHA_KUTULARI = ("#recaptcha-anchor", "#checkbox", "input[type=checkbox]", "[role=checkbox]")

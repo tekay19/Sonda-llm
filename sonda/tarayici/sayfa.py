@@ -1,7 +1,21 @@
 """Tek bir sekmenin kontrolü: bak, tıkla, yaz, kaydır... Güvenlik kararları koruma.py'dedir; burası uygular."""
+from urllib.parse import urlparse
+
 import trafilatura
 
-from .js import BAK, BILGI, CAPTCHA_ADRESLERI, CAPTCHA_BASLIKLARI, CAPTCHA_KUTULARI, ENGEL
+from .js import BAK, BILGI, CAPTCHA_BASLIKLARI, CAPTCHA_KUTULARI, ENGEL
+
+# Bilinen robot doğrulaması sunucuları -> çerçeve adresinin yol öneki. Adresin herhangi bir yerinde geçen kelimeye
+# değil, gerçek ana makineye bakılır (final inceleme: "evil.example/?hcaptcha.com" captcha sayılıyordu).
+CAPTCHA_SUNUCULARI = {"challenges.cloudflare.com": "/", "hcaptcha.com": "/", "newassets.hcaptcha.com": "/",
+                      "assets.hcaptcha.com": "/", "www.google.com": "/recaptcha/", "google.com": "/recaptcha/",
+                      "www.recaptcha.net": "/recaptcha/", "recaptcha.net": "/recaptcha/"}
+
+
+def captcha_adresi_mi(url):
+    p = urlparse(url)
+    onek = CAPTCHA_SUNUCULARI.get((p.hostname or "").lower())
+    return onek is not None and p.path.startswith(onek)
 
 
 ZAMAN_ASIMI = 20000
@@ -84,7 +98,7 @@ class Tarayici:
         """Görünür robot doğrulaması çerçeveleri ve ekrandaki kutuları (görünmez reCAPTCHA sayılmaz)."""
         ana, sonuc = self.sayfa.main_frame, []
         for f in self.sayfa.frames:
-            if f is ana or not any(a in f.url for a in CAPTCHA_ADRESLERI):
+            if f is ana or not captcha_adresi_mi(f.url):
                 continue
             try:
                 kutu = f.frame_element().bounding_box()
@@ -97,6 +111,13 @@ class Tarayici:
     def captcha_onayla(self):
         """Robot doğrulamasının onay kutusunu işaretler (kullanıcı izin verdi). Resimli bulmaca çözülmez."""
         for cerceve, alan in self._captcha_cerceveleri():
+            x, y = alan["x"] + min(30, alan["width"] / 2), alan["y"] + alan["height"] / 2
+            try:  # o noktada en üstte gerçekten bu çerçeve mi? (altındaki bir butona tıklatılmasın)
+                ustte = cerceve.frame_element().evaluate("(f, n) => document.elementFromPoint(n[0], n[1]) === f", [x, y])
+            except Exception:
+                ustte = False
+            if not ustte:
+                continue
             for secici in CAPTCHA_KUTULARI:
                 kutu = cerceve.locator(secici).first
                 try:
@@ -107,7 +128,7 @@ class Tarayici:
                 except Exception:
                     continue
             # Cloudflare: kutu kapalı shadow DOM'da, seçiciyle bulunamaz; insan gibi ekrandaki yerine (sol) tıkla
-            self.sayfa.mouse.click(alan["x"] + min(30, alan["width"] / 2), alan["y"] + alan["height"] / 2)
+            self.sayfa.mouse.click(x, y)
             self._bekle()
             return True
         return False
@@ -123,7 +144,7 @@ class Tarayici:
         loc = self._loc(no)
         loc.evaluate("e => { const a = e.closest('a'); if (a && a.target) a.removeAttribute('target'); }")
         try:
-            loc.click(timeout=4000)
+            loc.click(timeout=4000, no_wait_after=True)
         except Exception:
             # Upwork'te görülen zaman aşımı: çoğunlukla üstte çerez bildirimi/pop-up vardır; modele nedenini söyle
             try:
@@ -133,8 +154,13 @@ class Tarayici:
             if engel:
                 raise TiklamaEngeli(f"Tıklanacak öğenin üstünde başka bir öğe var: “{engel}”. Önce onu kapat "
                                     "(ör. çerezleri kabul et / pop-up'ı kapat) ya da sayfayı kaydır.") from None
-            loc.scroll_into_view_if_needed(timeout=3000)
-            loc.click(timeout=4000)
+            # Kör yeniden tıklama yok: tıklama olmuş da olabilir, ya da öğe değişmiş olabilir (koruma yeniden bakmalı)
+            try:
+                loc.scroll_into_view_if_needed(timeout=2000)
+            except Exception:
+                pass
+            raise RuntimeError("Tıklama zaman aşımına uğradı (tıklanmış da olabilir). Sayfanın yeni haline bak; "
+                               "gerekirse öğeyi yeniden seçip tekrar dene.") from None
         self._bekle()
 
     def yaz(self, no, metin, enter=False):

@@ -62,3 +62,12 @@ def _gecici_gorev_kayitlari(tmp_path_factory):
     ayar.KAYIT_KLASORU = tmp_path_factory.mktemp("gorev_kayitlari")
     yield
     ayar.KAYIT_KLASORU = eski
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _test_captcha_ana_makinesi():
+    """Testlerde yerel sahte captcha çerçeveleri localhost'tan gelir (gerçekte yalnızca bilinen captcha sunucuları)."""
+    from sonda.tarayici import sayfa
+    sayfa.CAPTCHA_SUNUCULARI["localhost"] = "/captcha"
+    yield
+    sayfa.CAPTCHA_SUNUCULARI.pop("localhost", None)
