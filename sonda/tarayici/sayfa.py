@@ -1,7 +1,7 @@
 """Tek bir sekmenin kontrolü: bak, tıkla, yaz, kaydır... Güvenlik kararları koruma.py'dedir; burası uygular."""
 import trafilatura
 
-from .js import BAK, BILGI, CAPTCHA_ADRESLERI, CAPTCHA_KUTULARI, ENGEL
+from .js import BAK, BILGI, CAPTCHA_ADRESLERI, CAPTCHA_BASLIKLARI, CAPTCHA_KUTULARI, ENGEL
 
 
 ZAMAN_ASIMI = 20000
@@ -76,25 +76,40 @@ class Tarayici:
 
     def bak(self):
         sayfa = self.sayfa.evaluate(BAK)
-        sayfa["captcha"] = bool(self._captcha_cerceveleri())
+        sayfa["captcha"] = bool(self._captcha_cerceveleri()) or \
+            any(b in sayfa["baslik"].lower() for b in CAPTCHA_BASLIKLARI)
         return sayfa
 
     def _captcha_cerceveleri(self):
-        ana = self.sayfa.main_frame
-        return [f for f in self.sayfa.frames if f is not ana and any(a in f.url for a in CAPTCHA_ADRESLERI)]
+        """Görünür robot doğrulaması çerçeveleri ve ekrandaki kutuları (görünmez reCAPTCHA sayılmaz)."""
+        ana, sonuc = self.sayfa.main_frame, []
+        for f in self.sayfa.frames:
+            if f is ana or not any(a in f.url for a in CAPTCHA_ADRESLERI):
+                continue
+            try:
+                kutu = f.frame_element().bounding_box()
+            except Exception:
+                continue
+            if kutu and kutu["width"] > 20 and kutu["height"] > 20:
+                sonuc.append((f, kutu))
+        return sonuc
 
     def captcha_onayla(self):
         """Robot doğrulamasının onay kutusunu işaretler (kullanıcı izin verdi). Resimli bulmaca çözülmez."""
-        for cerceve in self._captcha_cerceveleri():
+        for cerceve, alan in self._captcha_cerceveleri():
             for secici in CAPTCHA_KUTULARI:
                 kutu = cerceve.locator(secici).first
                 try:
-                    if kutu.count():
+                    if kutu.count() and kutu.is_visible():
                         kutu.click(timeout=5000)
                         self._bekle()
                         return True
                 except Exception:
                     continue
+            # Cloudflare: kutu kapalı shadow DOM'da, seçiciyle bulunamaz; insan gibi ekrandaki yerine (sol) tıkla
+            self.sayfa.mouse.click(alan["x"] + min(30, alan["width"] / 2), alan["y"] + alan["height"] / 2)
+            self._bekle()
+            return True
         return False
 
     def oge_bilgisi(self, no):

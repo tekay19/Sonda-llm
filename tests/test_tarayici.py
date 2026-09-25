@@ -209,3 +209,19 @@ def test_captcha_olmayan_sayfa(tarayici, site):
     tarayici.git(f"{site}/giris.html")
     assert tarayici.bak()["captcha"] is False
     assert tarayici.captcha_onayla() is False
+
+
+
+def test_kapali_shadow_dom_captcha_ekrandaki_yerinden_tiklanir(tarayici, site):
+    """Cloudflare onay kutusu kapalı shadow DOM'da: seçiciyle bulunamaz, iframe'in ekrandaki yerine tıklanır."""
+    tarayici.git(f"{site}/captcha_cf.html")
+    assert tarayici.bak()["captcha"] is True
+    assert tarayici.captcha_onayla() is True
+    tarayici.sayfa.wait_for_timeout(300)
+    assert tarayici.sayfa.inner_text("#durum") == "Doğrulandı"
+    assert tarayici.bak()["captcha"] is False  # 0x0 görünmez reCAPTCHA çerçevesi captcha sayılmaz
+
+
+def test_cloudflare_bekleme_ekrani_captcha_sayilir(tarayici, site):
+    tarayici.git(f"{site}/bir_dakika.html")
+    assert tarayici.bak()["captcha"] is True

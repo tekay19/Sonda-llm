@@ -72,6 +72,8 @@ ENGEL = """(e) => {
 
 # Robot doğrulaması (captcha) çerçevelerinin adreslerinde geçen parçalar
 CAPTCHA_ADRESLERI = ("recaptcha/api2/anchor", "recaptcha/enterprise/anchor", "hcaptcha.com", "challenges.cloudflare.com", "turnstile")
+# Cloudflare bekleme ekranı başlıkları (onay kutusu henüz yüklenmemiş olabilir)
+CAPTCHA_BASLIKLARI = ("just a moment", "bir dakika", "checking your browser", "attention required")
 CAPTCHA_KUTULARI = ("#recaptcha-anchor", "#checkbox", "input[type=checkbox]", "[role=checkbox]")
 
 BILGI = "(no) => { const acikla = " + ACIKLA + r""";

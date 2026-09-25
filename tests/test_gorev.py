@@ -871,3 +871,65 @@ def test_inceleme_sonucu_dusunerek_yazilir(sahte, yerel_tarayici_ac, site, monke
     monkeypatch.setattr(gorev.dongu.ollama, "chat", sahte_chat)
     calistir(yerel_tarayici_ac)
     assert dusunme == [True]
+
+
+
+# ---- Kullanıcı: "Cloudflare ve reCAPTCHA doğrulamasını yapmadı" -> model seçmese de kod kendisi işaretler
+def test_captcha_modele_sorulmadan_isaretlenir(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/captcha_cf.html"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac)
+    assert any(x["tur"] == "adim" and "Robot doğrulaması" in x["metin"] for x in o)
+    assert "Doğrulandı" in m.istemler[1]
+    assert "kullaniciya" not in turler(o)
+
+
+def test_isaretleme_yetmezse_kullaniciya_birakilir_modele_sorulmadan(sahte, yerel_tarayici_ac, site, monkeypatch):
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.3)
+    monkeypatch.setattr(gorev.ayar, "CAPTCHA_BEKLE", 0.5)
+    m = sahte([{"eylem": "git", "url": f"{site}/captcha.html?resimli=1"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
+    kul = [x for x in o if x["tur"] == "kullaniciya"]
+    assert len(kul) == 1 and "robot" in kul[0]["sebep"].lower()
+    assert len(m.istemler) == 1  # model captcha sayfasında hiç çağrılmadı
+
+
+
+# ---- Upwork testi: Sonda "Uma" (yapay zekâ asistanı) ile profil bağlantısını ayırt edemedi -> bağlantı adresi görünsün
+def _baglanti(metin, href):
+    return {"no": 3, "etiket": "a", "rol": "", "tip": "", "ad": "", "kimlik": "", "otomatik": "", "yer": "", "aria": "",
+            "baslik": "", "metin": metin, "deger": "", "href": href, "form": -1, "form_eylem": "", "ekranda": True}
+
+
+def test_baglanti_adresi_ozette_gorunur():
+    sayfa = {"url": "https://www.upwork.com/nx/find-work/", "baslik": "B", "metin": "",
+             "ogeler": [_baglanti("Semih T.", "https://www.upwork.com/freelancers/~01abc?viewMode=1"),
+                        _baglanti("Uma", "https://www.upwork.com/nx/uma/chat"),
+                        _baglanti("Blog", "https://community.upwork.com/blog/yazi"),
+                        _baglanti("Menü", "javascript:void(0)"), _baglanti("Yukarı", "https://www.upwork.com/nx/find-work/#ust")]}
+    ozet = gorev.sayfa_ozeti(sayfa)
+    assert '"Semih T." → /freelancers/~01abc' in ozet
+    assert '"Uma" → /nx/uma/chat' in ozet
+    assert '"Blog" → community.upwork.com/blog/yazi' in ozet
+    assert "javascript" not in ozet and "#ust" not in ozet
+
+
+def test_gorev_kaydi_yazilir_ve_sifre_gizlenir(sahte, yerel_tarayici_ac, site, tmp_path, monkeypatch):
+    """Hata ayıklama: her adımda modelin gördüğü istem ve kararı dosyaya yazılır (şifre gizli)."""
+    import json
+    monkeypatch.setattr(gorev.ayar, "KAYIT_KLASORU", tmp_path)
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "bitir"}])
+    calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sayfasında şifrem Parola-7788 ile gir")
+    dosyalar = list(tmp_path.glob("*.jsonl"))
+    assert len(dosyalar) == 1
+    satirlar = [json.loads(x) for x in dosyalar[0].read_text(encoding="utf-8").splitlines()]
+    assert satirlar[0]["adim"] == 1 and satirlar[0]["karar"]["eylem"] == "git" and "MEVCUT SAYFA" in satirlar[0]["istem"]
+    assert "Parola-7788" not in dosyalar[0].read_text(encoding="utf-8")
+
+
+def test_eski_gorev_kayitlari_silinir(tmp_path, monkeypatch):
+    from sonda.gorev.kayit import GorevKaydi
+    monkeypatch.setattr(gorev.ayar, "KAYIT_KLASORU", tmp_path)
+    monkeypatch.setattr(gorev.ayar, "KAYIT_SAYISI", 3)
+    for i in range(5):
+        GorevKaydi(f"g{i}", set()).yaz({"adim": 1})
+    assert len(list(tmp_path.glob("*.jsonl"))) == 3

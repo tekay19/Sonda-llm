@@ -116,6 +116,6 @@ kaldı, gidişat doğru mu, bir şeyi atladın mı (kaydırılmamış sayfa, aç
 daha akıllıca bir yol var mı? Sadece JSON döndür:
 {{"degerlendirme": "kullanıcıya 1-2 cümlelik doğal Türkçe durum özeti", "plan": ["kalan adımlar, güncellenmiş"]}}"""
 
-CAPTCHA_SEBEBI = ("🧩 Robot doğrulaması resimli bir bulmaca istiyor. Chrome'da bulmacayı çöz; tamamlanınca "
-                  "kendiliğinden devam edeceğim.")
+CAPTCHA_SEBEBI = ("🧩 Robot doğrulaması tamamlanamadı (resimli bulmaca ya da ek kontrol istiyor). Chrome'da "
+                  "doğrulamayı yap; tamamlanınca kendiliğinden devam edeceğim.")
 IKI_ADIM_TAMAM = "Kullanıcı iki adımlı doğrulamayı tamamladı; sayfaya bak ve kaldığın yerden devam et."

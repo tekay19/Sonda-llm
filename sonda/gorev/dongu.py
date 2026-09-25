@@ -1,5 +1,6 @@
 """Görev döngüsü: bak -> karar -> koruma -> uygula; kullanıcıya devretme, 2FA bekleme, sonuç yazma."""
 import json
+import time
 
 import ollama
 
@@ -11,6 +12,7 @@ from . import ayar
 from . import karar as kararlar
 from .eylemler import adim, uygula
 from .istem import istem
+from .kayit import GorevKaydi
 from .promptlar import CAPTCHA_SEBEBI, DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TAMAM, SONUC_PROMPTU
 from .sayfa import SayfaHafizasi, eksik_form_alanlari, iki_adim_mi
 
@@ -58,6 +60,9 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
     yapilan, erken_red, form_red, son_mesaj = 0, False, False, ""
+    captcha_denenen = set()
+    durum["gizli"].update(koruma.gizli_adaylar(gorev_metni))
+    kayit = GorevKaydi(g.id, durum["gizli"])
     def ilerleme():  # not sayısı ve açılan gerçek sayfa sayısı
         return len(notlar), sum(1 for u in hafiza_.sayfalar if u != "about:blank")
 
@@ -98,11 +103,31 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 return
             geri_bildirim, son_imza, tekrar = IKI_ADIM_TAMAM, None, 0
             sayfa, ekran = bak(t, ekran_iste)
+        if sayfa.get("captcha") and t.url not in captcha_denenen:
+            # Kullanıcı izni: robot doğrulamasının onay kutusu modele sorulmadan işaretlenir; yetmezse kullanıcıya
+            captcha_denenen.add(t.url)
+            onaylandi = t.captcha_onayla()
+            yield adim("tikla", "Robot doğrulamasının onay kutusu işaretlendi" if onaylandi else "Robot doğrulaması bekleniyor")
+            t.sayfa.wait_for_timeout(int(ayar.CAPTCHA_BEKLE * 1000))
+            sayfa, ekran = bak(t, ekran_iste)
+            geri_bildirim = "Robot doğrulaması geçildi; kaldığın yerden devam et."
+            if sayfa.get("captcha"):
+                adimlar.append(f"{adim_no}. robot doğrulaması kullanıcıya bırakıldı")
+                komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"))
+                if komut not in ("devam", "otomatik"):
+                    durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
+                                    else "Robot doğrulaması 15 dakika içinde yapılmadığı için görev bitti.")
+                    durum["kod"] = "durduruldu" if komut == "durdur" else "zaman_asimi"
+                    return
+                geri_bildirim = "Robot doğrulaması tamamlandı; kaldığın yerden devam et."
+                sayfa, ekran = bak(t, ekran_iste)
         hafiza_.goruldu(sayfa)
         ekran_iste = False
-        karar = kararlar.karar_al(model, istem(gorev_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa,
-                                                geri_bildirim, adim_no, maks), ekran,
-                                  dusunmeli(derinlik, adim_no, geri_bildirim))
+        istem_metni = istem(gorev_metni, onceki, derinlik, notlar, hafiza_, adimlar, sayfa, geri_bildirim, adim_no, maks)
+        dusun = dusunmeli(derinlik, adim_no, geri_bildirim)
+        karar = kararlar.karar_al(model, istem_metni, ekran, dusun)
+        kayit.yaz({"adim": adim_no, "zaman": time.strftime("%H:%M:%S"), "url": sayfa["url"], "dusun": dusun,
+                   "ekran": ekran is not None, "istem": istem_metni, "karar": karar})
         if karar is None:
             geri_bildirim = "Geçersiz cevap verdin; listedeki eylemlerden birini geçerli JSON olarak döndür."
             adimlar.append(f"{adim_no}. (geçersiz cevap)")

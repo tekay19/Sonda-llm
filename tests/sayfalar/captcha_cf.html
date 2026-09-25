@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Robot kontrolü</title>
+<h1>Verify you are human</h1>
+<iframe id="cf" src="captcha_kapali.html?challenges.cloudflare.com" width="300" height="65" style="border:0"></iframe>
+<iframe src="captcha_kutusu.html?recaptcha/api2/anchor&gorunmez" width="0" height="0" style="border:0"></iframe>
+<p id="durum">Doğrulanmadı</p>
+<script>
+addEventListener("message", e => { if (e.data !== "dogrulandi") return;
+  document.getElementById("cf").remove(); document.getElementById("durum").textContent = "Doğrulandı"; });
+</script></html>
