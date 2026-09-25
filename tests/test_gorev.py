@@ -316,7 +316,7 @@ def test_derinlik_cevabi_duzeltilir(monkeypatch):
             self.message = type("M", (), {"content": icerik})()
     monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
     d = gorev.karar.derinlik_belirle("m", "fiyat karşılaştır", "")
-    assert d["min_site"] == 5 and d["maks_adim"] == gorev.ayar.MAKS_ADIM and d["plan"] == ["a"]
+    assert d["min_site"] == 5 and d["maks_adim"] == gorev.ayar.ADIM_SINIRI["derin"] and d["plan"] == ["a"]
     monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y("bozuk"))
     assert gorev.karar.derinlik_belirle("m", "x", "")["derinlik"] == "orta"
 
