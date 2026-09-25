@@ -32,7 +32,7 @@ def yerel_tarayici_ac():
     Playwright'ın senkron API'si iş parçacığına bağlı olduğundan, fonksiyon onu kullanacak iş parçacığında çağrılmalıdır."""
     from playwright.sync_api import sync_playwright
 
-    from tarayici import Tarayici
+    from sonda.tarayici import Tarayici
 
     def ac():
         pw = sync_playwright().start()

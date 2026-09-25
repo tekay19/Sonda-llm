@@ -1,6 +1,6 @@
 import pytest
 
-import koruma
+from sonda import koruma
 
 
 def oge(**k):

@@ -1,7 +1,7 @@
 """Gerçek modelle uçtan uca görevler (yavaş). Çalıştır: python -m pytest tests/test_gorev_model.py -m model -v"""
 import pytest
 
-import gorev
+from sonda import gorev
 from conftest import ihlaller
 
 MODEL = "qwen3.6:35b-a3b"

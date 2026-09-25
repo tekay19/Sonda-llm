@@ -1,5 +1,7 @@
 import pytest
 
+from sonda.tarayici import SekmeKapandi
+
 from conftest import ihlaller
 
 
@@ -100,7 +102,7 @@ def test_baglan_baglantiyi_yeniden_kullanir(monkeypatch):
     """Gerçek Chrome her CDP bağlantısında izin sorar: baglan() bağlantıyı önbelleğe almalı."""
     import threading
 
-    import tarayici as tr
+    from sonda.tarayici import baglanti as tr
     hazir, bitti = threading.Event(), threading.Event()
 
     def sunucu():  # uzaktan hata ayıklama portu açık bir Chromium (kullanıcının Chrome'u yerine)
@@ -127,7 +129,7 @@ def test_baglan_baglantiyi_yeniden_kullanir(monkeypatch):
 
 def test_yerel_tarayici_ayari(monkeypatch):
     """Geliştirme/test için: SONDA_YEREL_TARAYICI ayarlıysa kullanıcının Chrome'u yerine Playwright Chromium'u açılır."""
-    import tarayici as tr
+    from sonda.tarayici import baglanti as tr
     monkeypatch.setenv("SONDA_YEREL_TARAYICI", "gizli")
     monkeypatch.setattr(tr, "_cdp_adresi", lambda: [])
     monkeypatch.setattr(tr, "CHROME", tr.Path("yok/chrome.exe"))  # yedek profil açılmasın
@@ -142,16 +144,18 @@ def test_acilir_pencere_kapaninca_onceki_sekmeye_doner(tarayici, site):
     tarayici.git(f"{site}/acilir.html")
     tarayici.tikla(bul(tarayici.bak(), "Pencere aç")["no"])
     import time
-    time.sleep(0.8)  # pencere 300 ms sonra kendini kapatır
+    son = time.monotonic() + 5  # pencere 300 ms sonra kendini kapatır; yüklü makinede gecikebilir
+    while not tarayici.url.endswith("/acilir.html") and time.monotonic() < son:
+        time.sleep(0.1)
     assert tarayici.url.endswith("/acilir.html")
     assert tarayici.bak()["baslik"] == "Açılır pencere"
 
 
 def test_sekme_kapaninca_sekme_kapandi_hatasi(tarayici, site):
-    import tarayici as tr
+    from sonda.tarayici import baglanti as tr
     tarayici.git(f"{site}/giris.html")
     tarayici.sayfa.close()
-    with pytest.raises(tr.SekmeKapandi):
+    with pytest.raises(SekmeKapandi):
         tarayici.bak()
 
 

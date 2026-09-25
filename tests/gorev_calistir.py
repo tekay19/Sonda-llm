@@ -10,7 +10,7 @@ KOK = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(KOK))
 sys.path.insert(0, str(KOK / "tests"))
 
-import gorev  # noqa: E402
+from sonda import gorev  # noqa: E402
 from gorevler import GOREVLER  # noqa: E402
 
 MODEL = "qwen3.6:35b-a3b"

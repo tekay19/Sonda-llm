@@ -2,7 +2,7 @@ import threading
 
 import pytest
 
-import gorev
+from sonda import gorev
 from conftest import ihlaller
 
 DERINLIK = {"derinlik": "basit", "min_site": 1, "maks_adim": 40, "plan": []}
@@ -32,9 +32,9 @@ def isci_bosalsin():
 def sahte(monkeypatch):
     def kur(eylemler):
         m = SahteModel(eylemler)
-        monkeypatch.setattr(gorev, "_karar_al", m)
-        monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: dict(DERINLIK))
-        monkeypatch.setattr(gorev, "_sonuc_yaz", lambda *a, **k: iter([{"tur": "token", "metin": "ÖZET"},
+        monkeypatch.setattr(gorev.karar, "karar_al", m)
+        monkeypatch.setattr(gorev.karar, "derinlik_belirle", lambda *a: dict(DERINLIK))
+        monkeypatch.setattr(gorev.dongu, "sonuc_yaz", lambda *a, **k: iter([{"tur": "token", "metin": "ÖZET"},
                                                                           {"tur": "cevap_bitti", "metin": "ÖZET"}]))
         return m
     return kur
@@ -89,7 +89,7 @@ def test_yasak_buton_engellenir_ve_kullaniciya_birakilir(sahte, yerel_tarayici_a
             satir = next(s for s in istem.splitlines() if "Giriş Yap" in s and s.startswith("["))
             karar["no"] = int(satir[1:satir.index("]")])
         return karar
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"], kayit=kayit)
     assert "kullaniciya" in turler(o)
     assert any(x["tur"] == "adim" and x["tip"] == "engel" for x in o)
@@ -107,7 +107,7 @@ def test_hassas_alana_yazma_engellenir(sahte, yerel_tarayici_ac, site):
             m.istemler.append(istem)
             return {"eylem": "yaz", "no": int(satir[1:satir.index("]")]), "metin": "4111111111111111"}
         return asil(model, istem, ekran)
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"], kayit=kayit)
     assert "kullaniciya" in turler(o)
     assert isinde(ihlaller, kayit["t"]) == []
@@ -135,7 +135,7 @@ def test_durdur_komutu_bekleyen_gorevi_bitirir(sahte, yerel_tarayici_ac, site):
 
 
 def test_bekleme_zaman_asimi(sahte, yerel_tarayici_ac, site, monkeypatch):
-    monkeypatch.setattr(gorev, "BEKLEME_SURESI", 0.5)
+    monkeypatch.setattr(gorev.ayar, "BEKLEME_SURESI", 0.5)
     sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}])
     olaylar = []
     for x in gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac):
@@ -144,7 +144,7 @@ def test_bekleme_zaman_asimi(sahte, yerel_tarayici_ac, site, monkeypatch):
 
 
 def test_adim_siniri(sahte, yerel_tarayici_ac, site, monkeypatch):
-    monkeypatch.setattr(gorev, "MAKS_ADIM", 3)
+    monkeypatch.setattr(gorev.ayar, "MAKS_ADIM", 3)
     m = sahte([{"eylem": "kaydir", "yon": "asagi"}] * 10)
     o = calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 3 and turler(o)[-1] == "cevap_bitti"
@@ -188,7 +188,7 @@ def test_koruma_taze_oge_bilgisini_kullanir(sahte, yerel_tarayici_ac, site):
             kayit["t"].sayfa.evaluate("document.getElementById('ekle').textContent = 'Hemen Al'")
             return {"eylem": "tikla", "no": int(satir[1:satir.index("]")])}
         return asil(model, istem, ekran)
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"], kayit=kayit)
     assert "kullaniciya" in turler(o)
     assert isinde(lambda: kayit["t"].sayfa.evaluate("localStorage.getItem('sepet')")) is None
@@ -207,7 +207,7 @@ def test_kopan_baglanti_gorevi_durdurur(sahte, yerel_tarayici_ac, site):
 
 
 def test_baglanti_hatasi_yardim_mesaji(monkeypatch):
-    import tarayici
+    from sonda import tarayici
 
     def hata():
         raise tarayici.BaglantiHatasi(tarayici.BAGLANTI_YARDIMI)
@@ -245,7 +245,7 @@ def test_gorevler_ayni_kalici_is_parcaciginda_calisir(sahte, yerel_tarayici_ac):
 def test_bekleme_sirasinda_nabiz_olayi(sahte, yerel_tarayici_ac, site, monkeypatch):
     """Kullanıcı beklenirken akış sessiz kalmamalı: arayüz koparsa sunucu bunu ancak bir şey yazınca fark eder
     ve generator'ı kapatır. Nabız yoksa yarım görev 15 dakika kuyruğu kilitler."""
-    monkeypatch.setattr(gorev, "NABIZ_ARALIGI", 0.2)
+    monkeypatch.setattr(gorev.ayar, "NABIZ_ARALIGI", 0.2)
     sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}])
     akis = gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac)
     for o in akis:
@@ -264,7 +264,7 @@ def test_sekme_kapaninca_gorev_ozetle_biter(sahte, yerel_tarayici_ac, site):
         if karar["eylem"] == "kaydir":
             kayit["t"].sayfa.close()  # kullanıcı sekmeyi kapattı
         return karar
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, kayit=kayit)
     assert not any(x["tur"] == "hata" for x in o)
     assert any(x["tur"] == "adim" and "kapat" in x["metin"] for x in o)
@@ -274,7 +274,7 @@ def test_sekme_kapaninca_gorev_ozetle_biter(sahte, yerel_tarayici_ac, site):
 
 def test_derinlik_plani_gosterilir(sahte, yerel_tarayici_ac, monkeypatch):
     sahte([{"eylem": "bitir", "sonuc": "x"}])
-    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 80,
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 80,
                                                                 "plan": ["Google'da ara", "3 siteyi karşılaştır"]})
     o = calistir(yerel_tarayici_ac)
     plan = next(x for x in o if x["tur"] == "adim" and x["tip"] == "plan")
@@ -288,7 +288,7 @@ def test_yetersiz_site_ile_bitirme_reddedilir(sahte, yerel_tarayici_ac, site, mo
                {"eylem": "git", "url": f"http://localhost:{site.rsplit(':', 1)[1]}/magaza/urun.html?id=2"},
                {"eylem": "not_al", "metin": "Kioxia ürün sayfası 2.649 TL"},
                {"eylem": "bitir", "sonuc": "tamam"}])
-    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "orta", "min_site": 2, "maks_adim": 40, "plan": []})
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle", lambda *a: {"derinlik": "orta", "min_site": 2, "maks_adim": 40, "plan": []})
     calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 6
     assert "en az 2" in m.istemler[3]
@@ -296,14 +296,14 @@ def test_yetersiz_site_ile_bitirme_reddedilir(sahte, yerel_tarayici_ac, site, mo
 
 def test_bitirme_iki_kez_reddedildikten_sonra_kabul_edilir(sahte, yerel_tarayici_ac, monkeypatch):
     m = sahte([{"eylem": "bitir", "sonuc": "a"}] * 5)
-    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 4, "maks_adim": 80, "plan": []})
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 4, "maks_adim": 80, "plan": []})
     calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 3
 
 
 def test_derinlik_adim_sinirini_belirler(sahte, yerel_tarayici_ac, monkeypatch):
     m = sahte([{"eylem": "kaydir", "yon": "asagi"}] * 10)
-    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "basit", "min_site": 1, "maks_adim": 4, "plan": []})
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle", lambda *a: {"derinlik": "basit", "min_site": 1, "maks_adim": 4, "plan": []})
     calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 4
 
@@ -312,11 +312,11 @@ def test_derinlik_cevabi_duzeltilir(monkeypatch):
     class Y:
         def __init__(self, icerik):
             self.message = type("M", (), {"content": icerik})()
-    monkeypatch.setattr(gorev.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
-    d = gorev._derinlik_belirle("m", "fiyat karşılaştır", "")
-    assert d["min_site"] == 5 and d["maks_adim"] == gorev.MAKS_ADIM and d["plan"] == ["a"]
-    monkeypatch.setattr(gorev.ollama, "chat", lambda **k: Y("bozuk"))
-    assert gorev._derinlik_belirle("m", "x", "")["derinlik"] == "orta"
+    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
+    d = gorev.karar.derinlik_belirle("m", "fiyat karşılaştır", "")
+    assert d["min_site"] == 5 and d["maks_adim"] == gorev.ayar.MAKS_ADIM and d["plan"] == ["a"]
+    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y("bozuk"))
+    assert gorev.karar.derinlik_belirle("m", "x", "")["derinlik"] == "orta"
 
 
 def _sayfa(ogeler=(), y=0, yukseklik=900, ekran=900):
@@ -363,7 +363,7 @@ def test_dusunceler_sonraki_adimlarda_hatirlanir(sahte, yerel_tarayici_ac, site)
 
 
 def test_sistem_promptu_akil_yurutme_ve_kesif_ister():
-    s = gorev.SISTEM
+    s = gorev.promptlar.SISTEM
     for ifade in ("değerlendir", "kaydır", "daha fazla", "İngilizce", "farklı site"):
         assert ifade.lower() in s.lower(), ifade
 
@@ -407,12 +407,12 @@ def test_hicbir_sey_yapmadan_devretme_reddedilir(sahte, yerel_tarayici_ac, site)
 
 
 def test_sonuc_promptu_uydurmayi_yasaklar():
-    s = gorev.SONUC_PROMPTU.lower()
+    s = gorev.promptlar.SONUC_PROMPTU.lower()
     assert "yalnızca" in s and "son adımlar" in s
 
 
 def test_sistem_promptu_devretmeden_once_yapilabileni_ister():
-    assert "devretmeden önce" in gorev.SISTEM.lower()
+    assert "devretmeden önce" in gorev.promptlar.SISTEM.lower()
 
 
 def test_gorevde_verilen_sifre_girilir_ve_gizlenir(sahte, yerel_tarayici_ac, site):
@@ -428,7 +428,7 @@ def test_gorevde_verilen_sifre_girilir_ve_gizlenir(sahte, yerel_tarayici_ac, sit
             satir = next(x for x in istem.splitlines() if "Şifre" in x and x.startswith("["))
             return {"eylem": "yaz", "no": int(satir[1:satir.index("]")]), "metin": "Parola-7788"}
         return asil(model, istem, ekran)
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, metin=metin, kayit=kayit)
     assert "kullaniciya" not in turler(o)
     assert isinde(lambda: kayit["t"].sayfa.input_value("[name=sifre]")) == "Parola-7788"
@@ -470,7 +470,7 @@ def test_iki_adim_olmayan_sayfa(sayfa):
 
 def test_iki_adimli_dogrulamada_durur_ve_kendiliginden_devam_eder(sahte, yerel_tarayici_ac, site, monkeypatch):
     """Kullanıcı isteği: 2FA isteyen yerde dur; kullanıcı doğrulamayı yapınca 'Devam' beklemeden sürdür."""
-    monkeypatch.setattr(gorev, "IKI_ADIM_KONTROL", 0.3)
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.3)
     m = sahte([{"eylem": "git", "url": f"{site}/iki_adim.html?bekle=2000"},
                {"eylem": "bitir", "sonuc": "x"}])
     olaylar = list(gorev.calistir("upwork'e gir", "sahte", tarayici_ac=yerel_tarayici_ac))  # hiç komut verilmez
@@ -482,21 +482,21 @@ def test_iki_adimli_dogrulamada_durur_ve_kendiliginden_devam_eder(sahte, yerel_t
 
 
 def test_iki_adimda_devam_komutu_da_calisir(sahte, yerel_tarayici_ac, site, monkeypatch):
-    monkeypatch.setattr(gorev, "IKI_ADIM_KONTROL", 0.3)
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.3)
     sahte([{"eylem": "git", "url": f"{site}/iki_adim.html"}, {"eylem": "bitir", "sonuc": "x"}])
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
     assert {"tur": "devam_edildi", "komut": "durdur"} in o
 
 
 def test_iki_adim_kod_alanina_yazilamaz():
-    import koruma
+    from sonda import koruma
     assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "123456"}, _girdi(otomatik="one-time-code"),
                               gorev_metni="upwork şifrem abc12345 kod 123456", url="https://upwork.com").izin
 
 
 def test_sistem_promptu_once_mevcut_oturumu_kullanir():
     """Kullanıcı isteği: önce tarayıcıdaki mevcut oturum; giriş bilgisi verilmediyse giriş yapma."""
-    p = gorev.SISTEM.lower()
+    p = gorev.promptlar.SISTEM.lower()
     assert "mevcut oturum" in p and "zaten giriş" in p
 
 
@@ -511,8 +511,33 @@ def test_giris_bilgisi_verilmeyen_gorevde_giris_kullaniciya_kalir(sahte, yerel_t
             satir = next(x for x in istem.splitlines() if "Giriş Yap" in x and x.startswith("["))
             return {"eylem": "tikla", "no": int(satir[1:satir.index("]")])}
         return asil(model, istem, ekran)
-    gorev._karar_al = akilli
+    gorev.karar.karar_al = akilli
     o = calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sitesindeki hesabıma bak", komutlar=["durdur"], kayit=kayit)
     assert "kullaniciya" in turler(o)
     assert isinde(ihlaller, kayit["t"]) == []
     isinde(kayit["t"]._kapat_asil)
+
+
+def test_otomatik_kontrol_hatasi_beklemeyi_bozmaz(monkeypatch):
+    """Sayfa yönlenirken okuma hata verebilir ('execution context destroyed'); bu, 2FA beklemesini çökertmemeli."""
+    from sonda.gorev.yonetim import Gorev
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.05)
+    cevaplar = iter([RuntimeError("Execution context was destroyed"), False, True])
+
+    def kontrol():
+        c = next(cevaplar)
+        if isinstance(c, Exception):
+            raise c
+        return c
+    assert Gorev().bekle(kontrol) == "otomatik"
+
+
+def test_otomatik_kontrolde_sekme_kapanirsa_yukselir(monkeypatch):
+    from sonda.gorev.yonetim import Gorev
+    from sonda.tarayici import SekmeKapandi
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.05)
+
+    def kontrol():
+        raise SekmeKapandi("kapandı")
+    with pytest.raises(SekmeKapandi):
+        Gorev().bekle(kontrol)
