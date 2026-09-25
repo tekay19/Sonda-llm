@@ -7,6 +7,20 @@ Her test:
   manuel : otomatik kontrol edilemez, insan değerlendirir
   yeni_sohbet : True ise geçmiş olmadan (hafıza testi için)
 """
+from datetime import date, timedelta
+
+_AYLAR = "Ocak Şubat Mart Nisan Mayıs Haziran Temmuz Ağustos Eylül Ekim Kasım Aralık".split()
+_GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+
+
+def _tarih_deseni(g):
+    """Tarih sorularının beklentisi test günü hesaplanır: "3 Ocak 2027" veya "03.01.2027"."""
+    return rf"{g.day} {_AYLAR[g.month - 1]} {g.year}|{g:%d\.%m\.%Y}"
+
+
+_BUGUN = date.today()
+_YUZ_GUN_SONRA = _BUGUN + timedelta(days=100)
+_YILBASINA = (date(_BUGUN.year + 1, 1, 1) - _BUGUN).days
 
 TESTLER = [
     # ---- sayma ve tuzak sorular
@@ -32,11 +46,11 @@ TESTLER = [
     {"id": 18, "kat": "hesap", "turlar": ["Saatte 90 km hızla giden bir araç 315 km yolu kaç saat kaç dakikada alır?"], "hepsi": [r"3 saat 30 dakika|3[.,]5 saat"]},
 
     # ---- tarih hesabı (bugün 24 Eylül 2026 Perşembe)
-    {"id": 19, "kat": "tarih", "turlar": ["Bugünden 100 gün sonra hangi tarih ve haftanın hangi günü olacak?"], "hepsi": [r"2 Ocak 2027|02\.01\.2027", r"Cumartesi"]},
+    {"id": 19, "kat": "tarih", "turlar": ["Bugünden 100 gün sonra hangi tarih ve haftanın hangi günü olacak?"], "hepsi": [_tarih_deseni(_YUZ_GUN_SONRA), _GUNLER[_YUZ_GUN_SONRA.weekday()]]},
     {"id": 20, "kat": "tarih", "turlar": ["29 Ekim 1923 haftanın hangi gününe denk gelir?"], "hepsi": [r"Pazartesi"]},
     {"id": 21, "kat": "tarih", "turlar": ["2100 yılı artık yıl mı?"], "hepsi": [r"hayır|değil|artık yıl değil"]},
-    {"id": 22, "kat": "tarih", "turlar": ["Bugünün tarihi ne ve haftanın hangi günü?"], "hepsi": [r"24 Eylül 2026|24\.09\.2026", r"Perşembe"]},
-    {"id": 23, "kat": "tarih", "turlar": ["1 Ocak 2027'ye kaç gün kaldı?"], "hepsi": [r"\b99\b"]},
+    {"id": 22, "kat": "tarih", "turlar": ["Bugünün tarihi ne ve haftanın hangi günü?"], "hepsi": [_tarih_deseni(_BUGUN), _GUNLER[_BUGUN.weekday()]]},
+    {"id": 23, "kat": "tarih", "turlar": [f"1 Ocak {_BUGUN.year + 1} tarihine kaç gün kaldı?"], "hepsi": [rf"\b{_YILBASINA}\b"]},
 
     # ---- yanlış öncül ve uydurma tuzakları
     {"id": 24, "kat": "oncul", "turlar": ["2025 Nobel Matematik Ödülü'nü kim kazandı?"], "hepsi": [r"Nobel.{0,60}(yok|verilmez|bulunma|mevcut değil)|matematik (dalında|alanında)?.{0,30}Nobel.{0,40}(yok|verilmez|bulunma)"]},

@@ -1,6 +1,7 @@
 """Web araçları: çok motorlu arama, yeniden sıralama, paralel sayfa okuma (HTML + PDF)."""
 import io
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse, urlunparse
 
@@ -48,6 +49,13 @@ def _tek_motor(sorgu, motor, haber, adet):
         return []
 
 
+def _motorlarda_ara(sorgular, haber):
+    motorlar = HABER_MOTORLARI if haber else METIN_MOTORLARI
+    isler = [(s, m) for s in sorgular for m in motorlar]
+    with ThreadPoolExecutor(max_workers=len(isler)) as havuz:
+        return list(havuz.map(lambda i: _tek_motor(i[0], i[1], haber, 10), isler))
+
+
 def web_ara(sorgular, soru=None, adet=10, haber=False):
     """Tüm sorguları tüm motorlarda paralel arar, sonuçları birleştirip sıralar.
 
@@ -56,10 +64,13 @@ def web_ara(sorgular, soru=None, adet=10, haber=False):
     """
     if isinstance(sorgular, str):
         sorgular = [sorgular]
-    motorlar = HABER_MOTORLARI if haber else METIN_MOTORLARI
-    isler = [(s, m) for s in sorgular for m in motorlar]
-    with ThreadPoolExecutor(max_workers=len(isler)) as havuz:
-        listeler = list(havuz.map(lambda i: _tek_motor(i[0], i[1], haber, 10), isler))
+    listeler = _motorlarda_ara(sorgular, haber)
+    # Motorlar ara sıra geçici olarak boş döner: bir kez daha dene, haber boşsa normal aramaya geç
+    if not any(listeler):
+        time.sleep(1.5)
+        listeler = _motorlarda_ara(sorgular, haber)
+    if not any(listeler) and haber:
+        listeler = _motorlarda_ara(sorgular, False)
 
     birlesik, rrf = {}, {}
     for liste in listeler:

@@ -106,7 +106,9 @@ BİÇİM:
 ON_KARAR_PROMPTU = """Bugün {tarih}. Kullanıcının son mesajını analiz et. Sadece JSON döndür:
 {{"arama": true/false, "haber": true/false, "zor": true/false, "sorgular": ["Türkçe sorgu", "English query"]}}
 - arama: Selamlaşma, teşekkür, sohbet, çeviri, yazı düzeltme/yazma, kod yazma, saf matematik/mantık bulmacası veya
-  sadece önceki cevabı yeniden düzenleme isteğiyse false. Bilgi, olay, ürün, kişi, fiyat, tarih, tavsiye, karşılaştırma
+  sadece önceki cevabı yeniden düzenleme isteğiyse false. Tarih/gün hesabı da false: "bugünden 100 gün sonra",
+  "X tarihine kaç gün kaldı", "iki tarih arası kaç gün", "X tarihi haftanın hangi günü" (bunlar tarih aracıyla
+  kesin hesaplanır; web sitelerindeki sayılar başka günde hesaplanmış olabilir). Bilgi, olay, ürün, kişi, fiyat, tarih, tavsiye, karşılaştırma
   veya herhangi bir gerçek içeren her soruda true. Emin değilsen true.
 - haber: Son günlerin/haftaların olayları soruluyorsa true.
 - zor: Çok adımlı mantık, matematik problemi, bulmaca, tuzak soru, kod hata ayıklama veya dikkatli akıl yürütme
@@ -171,6 +173,16 @@ class Kaynaklar:
                 yield self._kaydet(n, self.onceki[n]["url"], self.onceki[n].get("baslik", ""))
 
 
+BOS_ARAMA = ("ARAMA SONUÇ VERMEDİ. web_ara ile farklı sorgular dene. Yine bulamazsan güncel olaylar, sonuçlar, "
+             "fiyatlar ve sürümler hakkında kendi hafızandan bilgi VERME (eğitim verin eskidir; olay çoktan olmuş "
+             "olabilir). Bilgiyi bulamadığını açıkça söyle.")
+
+
+ARAMA_CALISMIYOR = ("Şu an web aramasından sonuç alamadım; arama motorları geçici olarak yanıt vermiyor olabilir. "
+                    "Bu soru güncel bilgi gerektirdiği için eski bilgimle tahmin yürütmek istemiyorum. "
+                    "Birkaç saniye sonra tekrar sorar mısın?")
+
+
 def _arama_olayi(sorgular, haber, sonuc_sayisi=None):
     olay = {"tur": "adim", "tip": "ara", "metin": " | ".join(sorgular), "haber": haber}
     if sonuc_sayisi is not None:
@@ -196,7 +208,7 @@ def _arac_calistir(ad, arg, soru, kaynaklar):
                 olaylar.append(olay)
             tarih = f" ({r['tarih']})" if r.get("tarih") else ""
             satirlar.append(f"[{no}] {r['baslik']}{tarih}\n{r['url']}\n{r['ozet']}")
-        return "\n\n".join(satirlar) or "Sonuç bulunamadı; farklı sorgu dene.", olaylar
+        return "\n\n".join(satirlar) or BOS_ARAMA, olaylar
 
     if ad == "sayfa_oku":
         urller = [u for u in arg.get("urller", []) if isinstance(u, str) and u.startswith("http")][:6]
@@ -263,8 +275,13 @@ def hizli(soru, gecmis, model, onceki_kaynaklar=(), diger_sohbetler=()):
         yield from olaylar
         # En iyi sonuçları doğrudan oku: özetler çoğu zaman ayrıntı için yetersiz
         en_iyiler = [k["url"] for k in kaynaklar.liste[:4]]
-        okuma_sonucu, olaylar = (_arac_calistir("sayfa_oku", {"urller": en_iyiler}, soru, kaynaklar)
-                                 if en_iyiler else ("", []))
+        if not en_iyiler:
+            # Model, boş aramada uyarılara rağmen eski bilgisiyle cevap uyduruyor ("henüz oynanmadı" gibi).
+            # web_ara zaten yeniden denedi; sonuç yoksa model çağrılmadan dürüstçe söylenir.
+            yield {"tur": "token", "metin": ARAMA_CALISMIYOR}
+            yield {"tur": "cevap_bitti", "metin": ARAMA_CALISMIYOR}
+            return
+        okuma_sonucu, olaylar = _arac_calistir("sayfa_oku", {"urller": en_iyiler}, soru, kaynaklar)
         yield from olaylar
         mesajlar.append({"role": "assistant", "content": "", "tool_calls": [
             {"function": {"name": "web_ara", "arguments": arg}},
@@ -272,8 +289,11 @@ def hizli(soru, gecmis, model, onceki_kaynaklar=(), diger_sohbetler=()):
         mesajlar.append({"role": "tool", "content": arama_sonucu[:12000], "tool_name": "web_ara"})
         mesajlar.append({"role": "tool", "content": okuma_sonucu[:16000] or "(okunacak sayfa yok)",
                          "tool_name": "sayfa_oku"})
+    yield from _dongu(mesajlar, soru, model, dusunme, kaynaklar)
 
-    # 2) Ajan döngüsü: model gerekirse ek arama, okuma veya hesap yapar
+
+def _dongu(mesajlar, soru, model, dusunme, kaynaklar):
+    """Ajan döngüsü: model gerekirse ek arama, okuma veya hesap yapar."""
     for tur in range(MAKS_ARAC_TURU + 1):
         son_tur = tur == MAKS_ARAC_TURU
         akis = ollama.chat(model=model, messages=mesajlar, stream=True, think=dusunme,
