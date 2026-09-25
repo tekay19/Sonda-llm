@@ -123,3 +123,51 @@ def test_baglan_baglantiyi_yeniden_kullanir(monkeypatch):
     finally:
         tr.baglantiyi_kes()
         bitti.set()
+
+
+def test_yerel_tarayici_ayari(monkeypatch):
+    """Geliştirme/test için: SONDA_YEREL_TARAYICI ayarlıysa kullanıcının Chrome'u yerine Playwright Chromium'u açılır."""
+    import tarayici as tr
+    monkeypatch.setenv("SONDA_YEREL_TARAYICI", "gizli")
+    monkeypatch.setattr(tr, "_cdp_adresi", lambda: [])
+    monkeypatch.setattr(tr, "CHROME", tr.Path("yok/chrome.exe"))  # yedek profil açılmasın
+    try:
+        t = tr.baglan()
+        assert t.sayfa.context.browser.is_connected()
+    finally:
+        tr.baglantiyi_kes()
+
+
+def test_acilir_pencere_kapaninca_onceki_sekmeye_doner(tarayici, site):
+    tarayici.git(f"{site}/acilir.html")
+    tarayici.tikla(bul(tarayici.bak(), "Pencere aç")["no"])
+    import time
+    time.sleep(0.8)  # pencere 300 ms sonra kendini kapatır
+    assert tarayici.url.endswith("/acilir.html")
+    assert tarayici.bak()["baslik"] == "Açılır pencere"
+
+
+def test_sekme_kapaninca_sekme_kapandi_hatasi(tarayici, site):
+    import tarayici as tr
+    tarayici.git(f"{site}/giris.html")
+    tarayici.sayfa.close()
+    with pytest.raises(tr.SekmeKapandi):
+        tarayici.bak()
+
+
+def test_metin_ekranda_gorunen_bolumu_verir_ve_kaydirinca_degisir(tarayici, site):
+    tarayici.git(f"{site}/uzun.html")
+    ust = tarayici.bak()
+    assert "Bölüm 1 " in ust["metin"] and "Bölüm 25" not in ust["metin"]
+    assert ust["kaydirma"]["y"] == 0 and ust["kaydirma"]["yukseklik"] > ust["kaydirma"]["ekran"] * 3
+    for _ in range(20):
+        tarayici.kaydir("asagi")
+    alt = tarayici.bak()
+    assert "Bölüm 30" in alt["metin"] and "Yorum 1" in alt["metin"] and "Bölüm 1 " not in alt["metin"]
+    assert alt["kaydirma"]["y"] > 0
+
+
+def test_daha_fazla_goster_butonu_icerik_acar(tarayici, site):
+    tarayici.git(f"{site}/uzun.html")
+    tarayici.tikla(bul(tarayici.bak(), "Daha fazla göster")["no"])
+    assert "gizli yorum açıldı" in tarayici.bak()["metin"]

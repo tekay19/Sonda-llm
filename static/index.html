@@ -210,6 +210,13 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .imlec::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; background: var(--metin); vertical-align: 1px; animation: yanip 1s ease-in-out infinite; }
 @keyframes yanip { 50% { opacity: .2; } }
 .hata-kutu { border: 1px solid var(--hata); color: var(--hata); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-top: 8px; }
+.devret-kart { border: 1px solid var(--vurgu); background: var(--vurgu-zemin); border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; }
+.devret-kart .sebep { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
+.devret-kart .sebep .ik { flex: none; margin-top: 2px; color: var(--vurgu); }
+.devret-kart p { margin: 6px 0 10px; color: var(--soluk); }
+.devret-kart .dugmeler { display: flex; gap: 8px; flex-wrap: wrap; }
+.devret-kart button { border: 1px solid var(--cizgi); background: var(--yuzey); color: var(--metin); border-radius: 8px; padding: 6px 14px; font: inherit; cursor: pointer; }
+.devret-kart button.birincil { background: var(--vurgu); border-color: var(--vurgu); color: var(--vurgu-metin); }
 
 /* kaynak kartları */
 .kaynak-seridi { display: flex; gap: 8px; overflow-x: auto; margin: 14px 0 4px; padding-bottom: 4px; scrollbar-width: thin; }
@@ -379,6 +386,8 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
   <symbol id="i-hesap" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7.5h7M8.5 12h.01M12 12h.01M15.5 12h.01M8.5 16h.01M12 16h.01M15.5 16h.01"/></symbol>
   <symbol id="i-hafiza" viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-4 12.7V19h8v-3.3A7 7 0 0 0 12 3ZM9.5 22h5"/></symbol>
   <symbol id="i-yaz" viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></symbol>
+  <symbol id="i-imlec" viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6Z"/><path d="m13 13 5 5"/></symbol>
+  <symbol id="i-dunya" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
 </svg>
 
 <div class="uygulama" id="uygulama">
@@ -422,6 +431,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
           <div class="mod-sec" role="group" aria-label="Araştırma modu">
             <button type="button" data-mod="hizli" title="Gerektiğinde arar, hızlı cevap verir"><svg class="ik"><use href="#i-simsek"/></svg>Hızlı</button>
             <button type="button" data-mod="derin" title="Alt sorulara böler, onlarca kaynak okur, rapor yazar"><svg class="ik"><use href="#i-mercek"/></svg>Derin araştırma</button>
+            <button type="button" data-mod="gorev" title="Chrome'unda senin için gezinir, bilgi toplar, form doldurur"><svg class="ik"><use href="#i-imlec"/></svg>Görev</button>
           </div>
           <button class="gonder" id="gonder" type="submit" aria-label="Gönder" disabled><svg class="ik"><use href="#i-yukari"/></svg></button>
         </div>
@@ -494,7 +504,7 @@ $("#model").onchange = e => depo.yaz("sonda-model", e.target.value);
 function modSec(m) {
   S.mod = m; depo.yaz("sonda-mod", m);
   document.querySelectorAll(".mod-sec button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mod === m));
-  alan.placeholder = m === "derin" ? "Derinlemesine araştırılacak konuyu yaz" : "Sonda'ya bir şey sor";
+  alan.placeholder = { derin: "Derinlemesine araştırılacak konuyu yaz", gorev: "Chrome'da yapılacak görevi yaz (ör. iki sitede fiyat karşılaştır)" }[m] || "Sonda'ya bir şey sor";
 }
 document.querySelectorAll(".mod-sec button").forEach(b => b.onclick = () => { modSec(b.dataset.mod); alan.focus(); });
 
@@ -610,15 +620,22 @@ const ADIM = {
   ara: { ik: "ara", ad: "Web'de arandı" }, oku: { ik: "dosya", ad: "Sayfalar okundu" },
   plan: { ik: "plan", ad: "Plan" }, yaz: { ik: "yaz", ad: "Yazılıyor" },
   dusun: { ik: "beyin", ad: "Düşündü" }, hesap: { ik: "hesap", ad: "Hesaplandı" },
+  baglan: { ik: "dunya", ad: "Chrome" }, gezin: { ik: "dunya", ad: "Gezindi" }, tikla: { ik: "imlec", ad: "Tıkladı" },
+  gir: { ik: "kalem", ad: "Doldurdu" }, not: { ik: "kitap", ad: "Not aldı" }, bak: { ik: "ekran", ad: "Ekrana baktı" },
+  incele: { ik: "dosya", ad: "Sayfayı okudu" }, engel: { ik: "kilit", ad: "Sana bırakıldı" }, hata: { ik: "kapat", ad: "Olmadı" },
+  kullanici: { ik: "kilit", ad: "Senin sıran" },
 };
+const GOREV_TIPLERI = new Set(["baglan", "gezin", "tikla", "gir", "not", "bak", "incele", "engel", "hata", "kullanici"]);
 function izOzeti(iz, canli) {
   if (canli) {
     const son = iz.adimlar[iz.adimlar.length - 1];
+    if (son && GOREV_TIPLERI.has(son.tip)) return `<span class="canli-yazi">${kacis(son.metin)}</span>`;
     const yazi = !son ? "Düşünüyor" : son.tip === "ara" ? `Aranıyor: ${son.metin.split(" | ")[0]}` : son.tip === "oku" ? `${son.metin.split(", ").length} sayfa okunuyor` : son.tip === "plan" ? "Araştırma planlanıyor" : son.tip === "dusun" ? "Düşünüyor" : son.tip === "hesap" ? "Hesaplanıyor" : "Cevap yazılıyor";
     return `<span class="canli-yazi">${kacis(yazi)}</span>`;
   }
   const aramalar = iz.adimlar.filter(a => a.tip === "ara").length;
-  const parca = [aramalar && `${aramalar} arama`, iz.kaynaklar.length && `${iz.kaynaklar.length} kaynak`, iz.sure && `${iz.sure} sn`].filter(Boolean);
+  const eylem = iz.adimlar.filter(a => GOREV_TIPLERI.has(a.tip)).length;
+  const parca = [eylem && `${eylem} adım`, aramalar && `${aramalar} arama`, iz.kaynaklar.length && `${iz.kaynaklar.length} kaynak`, iz.sure && `${iz.sure} sn`].filter(Boolean);
   return kacis(parca.join(", "));
 }
 function izHTML(iz, canli) {
@@ -656,6 +673,9 @@ function asistanGuncelle(d, m, canli) {
   d.classList.toggle("calisiyor", canli);
   const acikti = $(".iz", d)?.open;
   $(".govde", d).innerHTML = izHTML(iz, canli)
+    + (canli && m.bekleyen ? `<div class="devret-kart" role="alert"><div class="sebep">${ik("kilit")}<span>${kacis(m.bekleyen.sebep)}</span></div>
+        <p>Chrome'da Sonda'nın sekmesinde vurgulanan yerde işini bitir, sonra “Devam”a bas. İstersen görevi burada bitirebilirsin.</p>
+        <div class="dugmeler"><button type="button" class="birincil" data-gorev="devam">Devam</button><button type="button" data-gorev="durdur">Görevi bitir</button></div></div>` : "")
     + `<div class="cevap${canli ? " imlec" : ""}">${isle(m.content, new Set(iz.kaynaklar.map(k => String(k.no))))}</div>`
     + (m.hata ? `<div class="hata-kutu">${kacis(m.hata)}</div>` : "")
     + (canli ? "" : kaynakSeridi(iz) + (sonMu && m.oneriler?.length ? `<div class="takip"><h4>${ik("dal")}İlgili sorular</h4>${m.oneriler.map(o =>
@@ -664,7 +684,7 @@ function asistanGuncelle(d, m, canli) {
         <button data-kopyala title="Kopyala" aria-label="Kopyala">${ik("kopya")}</button>
         ${sonMu ? `<button data-yenile title="Yeniden oluştur" aria-label="Yeniden oluştur">${ik("yenile")}</button>` : ""}
         ${iz.kaynaklar.length ? `<button data-kaynaklar title="Kaynaklar" aria-label="Kaynaklar">${ik("kitap")}</button>` : ""}
-        <span class="ozet">${m.mod === "derin" ? "Derin araştırma" : ""}</span></div>`);
+        <span class="ozet">${{ derin: "Derin araştırma", gorev: "Görev" }[m.mod] || ""}</span></div>`);
   if (!canli && acikti) $(".iz", d).open = true;
 }
 
@@ -733,6 +753,17 @@ $("#sutun").addEventListener("click", e => {
   }
 });
 
+// ---------- görev modu: kullanıcıya devredilen adımlar
+function gorevKomutu(komut) {
+  if (S.gorevId) fetch(`/api/gorev/${S.gorevId}/${komut}`, { method: "POST" }).catch(() => {});
+}
+$("#sutun").addEventListener("click", e => {
+  const b = e.target.closest("[data-gorev]"); if (!b) return;
+  const el = b.closest(".m-asistan"); const m = aktifSohbet()?.mesajlar[el?.dataset.indeks];
+  gorevKomutu(b.dataset.gorev);
+  if (m) { m.bekleyen = null; asistanGuncelle(el, m, true); }
+});
+
 // ---------- mesaj kutusu
 const alan = $("#soru");
 const gonderBtn = $("#gonder");
@@ -743,7 +774,7 @@ function kutuDurumu() {
 }
 alan.addEventListener("input", () => { alan.style.height = "auto"; alan.style.height = alan.scrollHeight + "px"; kutuDurumu(); });
 alan.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!S.calisiyor) gonder(); } });
-$("#form").onsubmit = e => { e.preventDefault(); S.calisiyor ? S.iptal?.abort() : gonder(); };
+$("#form").onsubmit = e => { e.preventDefault(); if (S.calisiyor) { gorevKomutu("durdur"); S.iptal?.abort(); } else gonder(); };
 
 async function gonder() {
   const soru = alan.value.trim();
@@ -802,7 +833,10 @@ async function gonder() {
         else if (o.tur === "kaynak") { m.iz.kaynaklar.push(o); m.iz.kaynaklar.sort((a, b) => a.no - b.no); }
         else if (o.tur === "bitti") m.iz.sure = o.sure;
         else if (o.tur === "oneriler") m.oneriler = o.liste;
-        else if (o.tur === "hata") m.hata = `Bir hata oluştu: ${o.metin}. Ollama'nın açık olduğunu ve seçili modelin indirildiğini kontrol et.`;
+        else if (o.tur === "gorev_basladi") { m.gorevId = o.id; S.gorevId = o.id; }
+        else if (o.tur === "kullaniciya") { m.bekleyen = { sebep: o.sebep }; m.iz.adimlar.push({ tip: "kullanici", metin: o.sebep }); bildir("Sonda seni bekliyor"); }
+        else if (o.tur === "devam_edildi") m.bekleyen = null;
+        else if (o.tur === "hata") m.hata = `Bir hata oluştu: ${o.metin}.` + (/ollama|connect|model/i.test(o.metin) ? " Ollama'nın açık olduğunu ve seçili modelin indirildiğini kontrol et." : "");
       }
       ciz();
     }
@@ -810,7 +844,7 @@ async function gonder() {
     if (e.name === "AbortError") m.content += m.content ? "\n\n*Durduruldu.*" : "*Durduruldu.*";
     else m.hata = "Sunucuya ulaşılamadı. Sonda'yı baslat.bat ile başlattığından emin ol.";
   }
-  S.calisiyor = false; kutuDurumu(); kaydet();
+  S.calisiyor = false; S.gorevId = null; m.bekleyen = null; kutuDurumu(); kaydet();
   setTimeout(() => hafizaCiz(), 8000);
   if (S.aktif === s.id) {
     asistanGuncelle(aEl, m, false);

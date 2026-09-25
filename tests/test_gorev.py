@@ -5,6 +5,7 @@ import pytest
 import gorev
 from conftest import ihlaller
 
+DERINLIK = {"derinlik": "basit", "min_site": 1, "maks_adim": 40, "plan": []}
 isinde = gorev.tarayici_isinde  # Playwright nesneleri tarayıcı iş parçacığına bağlıdır
 
 
@@ -20,11 +21,19 @@ class SahteModel:
         return self.eylemler.pop(0) if self.eylemler else {"eylem": "bitir", "sonuc": "bitti"}
 
 
+@pytest.fixture(autouse=True)
+def isci_bosalsin():
+    """Kopan/kapatılan görevin işçisi bitmeden sonraki test başlamasın (sahte modeli paylaşmasınlar)."""
+    yield
+    gorev.tarayici_isinde(lambda: None)
+
+
 @pytest.fixture
 def sahte(monkeypatch):
     def kur(eylemler):
         m = SahteModel(eylemler)
         monkeypatch.setattr(gorev, "_karar_al", m)
+        monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: dict(DERINLIK))
         monkeypatch.setattr(gorev, "_sonuc_yaz", lambda *a, **k: iter([{"tur": "token", "metin": "ÖZET"},
                                                                           {"tur": "cevap_bitti", "metin": "ÖZET"}]))
         return m
@@ -231,3 +240,129 @@ def test_gorevler_ayni_kalici_is_parcaciginda_calisir(sahte, yerel_tarayici_ac):
         sahte([{"eylem": "bitir", "sonuc": "x"}])
         list(gorev.calistir("g", "sahte", tarayici_ac=ac))
     assert len(kimlikler) == 2 and kimlikler[0] == kimlikler[1] != threading.get_ident()
+
+
+def test_bekleme_sirasinda_nabiz_olayi(sahte, yerel_tarayici_ac, monkeypatch):
+    """Kullanıcı beklenirken akış sessiz kalmamalı: arayüz koparsa sunucu bunu ancak bir şey yazınca fark eder
+    ve generator'ı kapatır. Nabız yoksa yarım görev 15 dakika kuyruğu kilitler."""
+    monkeypatch.setattr(gorev, "NABIZ_ARALIGI", 0.2)
+    sahte([{"eylem": "sana_birak", "sebep": "?"}])
+    akis = gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac)
+    for o in akis:
+        if o["tur"] == "kullaniciya":
+            break
+    assert next(akis)["tur"] == "nabiz"
+    akis.close()
+
+
+def test_sekme_kapaninca_gorev_ozetle_biter(sahte, yerel_tarayici_ac, site):
+    kayit = {}
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "kaydir", "yon": "asagi"}])
+    asil = m.__call__
+    def akilli(model, istem, ekran=None):
+        karar = asil(model, istem, ekran)
+        if karar["eylem"] == "kaydir":
+            kayit["t"].sayfa.close()  # kullanıcı sekmeyi kapattı
+        return karar
+    gorev._karar_al = akilli
+    o = calistir(yerel_tarayici_ac, kayit=kayit)
+    assert not any(x["tur"] == "hata" for x in o)
+    assert any(x["tur"] == "adim" and "kapat" in x["metin"] for x in o)
+    assert turler(o)[-1] == "cevap_bitti"
+    isinde(kayit["t"]._kapat_asil)
+
+
+def test_derinlik_plani_gosterilir(sahte, yerel_tarayici_ac, monkeypatch):
+    sahte([{"eylem": "bitir", "sonuc": "x"}])
+    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 80,
+                                                                "plan": ["Google'da ara", "3 siteyi karşılaştır"]})
+    o = calistir(yerel_tarayici_ac)
+    plan = next(x for x in o if x["tur"] == "adim" and x["tip"] == "plan")
+    assert plan["detay"] == ["Google'da ara", "3 siteyi karşılaştır"]
+
+
+def test_yetersiz_site_ile_bitirme_reddedilir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/magaza/ara.html?q=nvme"},
+               {"eylem": "not_al", "metin": "Kioxia 2.649 TL"},
+               {"eylem": "bitir", "sonuc": "erken"},
+               {"eylem": "git", "url": f"http://localhost:{site.rsplit(':', 1)[1]}/magaza/urun.html?id=2"},
+               {"eylem": "not_al", "metin": "Kioxia ürün sayfası 2.649 TL"},
+               {"eylem": "bitir", "sonuc": "tamam"}])
+    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "orta", "min_site": 2, "maks_adim": 40, "plan": []})
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 6
+    assert "en az 2" in m.istemler[3]
+
+
+def test_bitirme_iki_kez_reddedildikten_sonra_kabul_edilir(sahte, yerel_tarayici_ac, monkeypatch):
+    m = sahte([{"eylem": "bitir", "sonuc": "a"}] * 5)
+    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "derin", "min_site": 4, "maks_adim": 80, "plan": []})
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 3
+
+
+def test_derinlik_adim_sinirini_belirler(sahte, yerel_tarayici_ac, monkeypatch):
+    m = sahte([{"eylem": "kaydir", "yon": "asagi"}] * 10)
+    monkeypatch.setattr(gorev, "_derinlik_belirle", lambda *a: {"derinlik": "basit", "min_site": 1, "maks_adim": 4, "plan": []})
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 4
+
+
+def test_derinlik_cevabi_duzeltilir(monkeypatch):
+    class Y:
+        def __init__(self, icerik):
+            self.message = type("M", (), {"content": icerik})()
+    monkeypatch.setattr(gorev.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
+    d = gorev._derinlik_belirle("m", "fiyat karşılaştır", "")
+    assert d["min_site"] == 5 and d["maks_adim"] == gorev.MAKS_ADIM and d["plan"] == ["a"]
+    monkeypatch.setattr(gorev.ollama, "chat", lambda **k: Y("bozuk"))
+    assert gorev._derinlik_belirle("m", "x", "")["derinlik"] == "orta"
+
+
+def _sayfa(ogeler=(), y=0, yukseklik=900, ekran=900):
+    return {"url": "https://ornek.com/a", "baslik": "B", "ogeler": list(ogeler), "metin": "metin",
+            "kaydirma": {"y": y, "yukseklik": yukseklik, "ekran": ekran}}
+
+
+def test_ozet_asagida_icerik_oldugunu_soyler():
+    ozet = gorev.sayfa_ozeti(_sayfa(y=0, yukseklik=5000, ekran=1000))
+    assert "aşağıda daha fazla içerik var" in ozet.lower() and "%20" in ozet
+    assert "aşağıda daha fazla" not in gorev.sayfa_ozeti(_sayfa(y=4000, yukseklik=5000, ekran=1000)).lower()
+
+
+@pytest.mark.parametrize("metin", ["Daha fazla göster", "Devamını oku", "Tümünü gör", "Show more", "Load more",
+                                   "See all reviews", "Read more", "Sonraki sayfa", "Next"])
+def test_daha_fazla_butonlari_isaretlenir(metin):
+    o = {"no": 7, "etiket": "button", "rol": "", "tip": "", "ad": "", "kimlik": "", "otomatik": "", "yer": "",
+         "aria": "", "baslik": "", "metin": metin, "deger": "", "href": "", "form": -1, "form_eylem": "", "ekranda": True}
+    assert "daha fazla içerik" in gorev.sayfa_ozeti(_sayfa([o]))
+
+
+def test_ziyaret_edilen_sayfalar_ve_notlar_unutulmaz(sahte, yerel_tarayici_ac, site):
+    """Son 8 adımdan eski sayfalar da hafızada kalmalı: nerede ne yapıldı, ne bulundu."""
+    m = sahte([{"eylem": "git", "url": f"{site}/magaza/ara.html?q=nvme"},
+               {"eylem": "not_al", "metin": "Kioxia 2.649 TL"},
+               {"eylem": "git", "url": f"{site}/uzun.html"}]
+              + [{"eylem": "kaydir", "yon": "asagi"}] * 10)
+    calistir(yerel_tarayici_ac)
+    son = m.istemler[-1]
+    hafiza_bolumu = son[son.index("ZİYARET EDİLEN SAYFALAR"):son.index("SON ADIMLAR")]
+    assert "magaza/ara.html?q=nvme" in hafiza_bolumu and "Kioxia 2.649 TL" in hafiza_bolumu
+    assert "uzun.html" in hafiza_bolumu and "görüldü" in hafiza_bolumu
+    assert "kaydırıldı" in hafiza_bolumu
+
+
+def test_dusunceler_sonraki_adimlarda_hatirlanir(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"dusunce": "Arama sayfasını açıyorum, sonra en ucuzu seçeceğim", "eylem": "git",
+                "url": f"{site}/magaza/ara.html?q=nvme"},
+               {"dusunce": "En ucuz Kioxia görünüyor, doğrulamak için ürün sayfasına bakacağım", "eylem": "kaydir"},
+               {"eylem": "bitir", "sonuc": "x"}])
+    calistir(yerel_tarayici_ac)
+    assert "En ucuz Kioxia görünüyor" in m.istemler[2]
+    assert "Arama sayfasını açıyorum" in m.istemler[2]
+
+
+def test_sistem_promptu_akil_yurutme_ve_kesif_ister():
+    s = gorev.SISTEM
+    for ifade in ("değerlendir", "kaydır", "daha fazla", "İngilizce", "farklı site"):
+        assert ifade.lower() in s.lower(), ifade

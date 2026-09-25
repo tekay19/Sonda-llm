@@ -55,8 +55,22 @@ _BAK = "() => { const acikla = " + _ACIKLA + r""";
     e.setAttribute('data-sonda-id', ++no);
     ogeler.push(acikla(e));
   }
-  const metin = document.body ? document.body.innerText.replace(/\n{3,}/g, '\n\n') : '';
-  return { url: location.href, baslik: document.title, ogeler, metin: metin.slice(0, 2500) };
+  // Sadece ekranda (ve hemen altında) görünen metin: kaydırınca model sayfanın devamını görür
+  const parcalar = []; let uzunluk = 0;
+  if (document.body) {
+    const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const alt = innerHeight + 300;
+    for (let n; (n = w.nextNode()) && uzunluk < 3000;) {
+      const t = n.textContent.replace(/\s+/g, ' ').trim(); const el = n.parentElement;
+      if (!t || !el || ['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE'].includes(el.tagName)) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 || r.bottom < -50 || r.top > alt) continue;
+      if (getComputedStyle(el).visibility === 'hidden') continue;
+      parcalar.push(t); uzunluk += t.length + 1;
+    }
+  }
+  const kaydirma = { y: Math.round(scrollY), yukseklik: document.documentElement.scrollHeight, ekran: innerHeight };
+  return { url: location.href, baslik: document.title, ogeler, metin: parcalar.join(' ').slice(0, 3000), kaydirma };
 }"""
 
 _BILGI = "(no) => { const acikla = " + _ACIKLA + r""";
@@ -72,22 +86,39 @@ class BaglantiHatasi(Exception):
     pass
 
 
+class SekmeKapandi(Exception):
+    """Sonda'nın sekmesi (ve dönülecek önceki sekmeler) kapandı; büyük ihtimalle kullanıcı kapattı."""
+
+
 class Tarayici:
     def __init__(self, sayfa, kapat=None):
         self._kapat = kapat
+        self._onceki = []  # açılır pencereye geçince önceki sekmeler; pencere kapanırsa geri dönülür
         self._ac(sayfa)
 
     def _ac(self, sayfa):
-        self.sayfa = sayfa
+        self._sayfa = sayfa
         sayfa.on("popup", self._acilir_pencere)
         sayfa.on("dialog", lambda d: d.dismiss())  # confirm("Sipariş verilsin mi?") gibi pencereler reddedilir
 
     def _acilir_pencere(self, yeni):
+        self._onceki.append(self._sayfa)
         self._ac(yeni)  # window.open ile açılan sekmede çalışmaya devam et
 
     @property
+    def sayfa(self):
+        while self._sayfa.is_closed() and self._onceki:
+            self._sayfa = self._onceki.pop()
+        if self._sayfa.is_closed():
+            raise SekmeKapandi("Sonda'nın sekmesi kapatıldı.")
+        return self._sayfa
+
+    @property
     def url(self):
-        return self.sayfa.url
+        try:
+            return self.sayfa.url
+        except SekmeKapandi:
+            return self._sayfa.url  # son bilinen adres
 
     @property
     def baslik(self):
@@ -230,6 +261,9 @@ def _yeni_baglanti():
     from playwright.sync_api import sync_playwright
 
     pw = sync_playwright().start()
+    yerel = os.environ.get("SONDA_YEREL_TARAYICI")  # geliştirme/test: "gizli" ya da "acik"
+    if yerel:
+        return pw, pw.chromium.launch(headless=yerel == "gizli")
     adresler = _cdp_adresi()
     if not adresler and CHROME.exists():
         yedek = _yedek_profili_ac()
