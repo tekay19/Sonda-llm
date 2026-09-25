@@ -1,0 +1,24 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Arama - TeknoPazar</title>
+<script src="../ortak.js"></script>
+<form action="ara.html"><input name="q" id="q"><button>Ara</button></form>
+<label>Sırala <select id="sirala"><option value="">Önerilen</option><option value="artan">Fiyat artan</option></select></label>
+<ul id="liste"></ul>
+<script>
+const URUNLER = [
+  { id: 1, ad: "Samsung 990 EVO Plus 1TB NVMe SSD", fiyat: 3199 },
+  { id: 2, ad: "Kioxia Exceria Plus G3 1TB NVMe SSD", fiyat: 2649 },
+  { id: 3, ad: "WD Black SN770 1TB NVMe SSD", fiyat: 2899 },
+  { id: 4, ad: "Kingston A400 480GB SATA SSD", fiyat: 1099 },
+  { id: 5, ad: "Samsung 990 Pro 2TB NVMe SSD", fiyat: 6499 },
+  { id: 6, ad: "Logitech K120 Klavye", fiyat: 399 },
+];
+const q = new URLSearchParams(location.search).get("q") || "";
+document.getElementById("q").value = q;
+const kelimeler = q.toLocaleLowerCase("tr").split(/\s+/).filter(Boolean);
+function ciz() {
+  let l = URUNLER.filter(u => kelimeler.every(k => u.ad.toLocaleLowerCase("tr").includes(k)) || kelimeler.some(k => u.ad.toLocaleLowerCase("tr").includes(k)));
+  if (document.getElementById("sirala").value === "artan") l = [...l].sort((a, b) => a.fiyat - b.fiyat);
+  document.getElementById("liste").innerHTML = l.map(u => `<li><a href="urun.html?id=${u.id}">${u.ad}</a> — ${u.fiyat.toLocaleString("tr")} TL</li>`).join("") || "<li>Sonuç yok</li>";
+}
+document.getElementById("sirala").onchange = ciz; ciz();
+</script></html>

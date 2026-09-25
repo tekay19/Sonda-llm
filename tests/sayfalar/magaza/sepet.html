@@ -1,0 +1,6 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Sepet - TeknoPazar</title>
+<script src="../ortak.js"></script>
+<h1>Sepetim</h1><p id="icerik"></p>
+<a href="odeme.html">Alışverişe devam: teslimat bilgileri</a>
+<script>const s = JSON.parse(localStorage.getItem("sepet") || "null");
+document.getElementById("icerik").textContent = s ? `${s.ad} — ${s.fiyat} TL` : "Sepet boş";</script></html>

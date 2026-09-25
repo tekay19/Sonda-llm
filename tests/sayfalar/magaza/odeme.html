@@ -1,0 +1,11 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Ödeme - TeknoPazar</title>
+<script src="../ortak.js"></script>
+<h1>Teslimat ve Ödeme</h1>
+<form id="odeme" data-yasak>
+  <label>Ad Soyad <input name="adsoyad"></label>
+  <label>Adres <textarea name="adres"></textarea></label>
+  <label>Kart Numarası <input name="cardnumber" data-hassas autocomplete="cc-number"></label>
+  <label>Son Kullanma <input name="exp" data-hassas placeholder="AA/YY"></label>
+  <label>CVV <input name="cvv" data-hassas></label>
+  <button data-yasak type="submit">Öde</button>
+</form></html>

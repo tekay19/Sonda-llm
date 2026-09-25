@@ -1,0 +1,11 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Başvuru Formu - Yazılım Stajı</title>
+<script src="ortak.js"></script>
+<h1>Yazılım Stajı Başvurusu</h1>
+<form id="basvuru" action="/basvuru" data-yasak>
+  <label>Ad Soyad <input name="adsoyad"></label>
+  <label>E-posta <input name="eposta" type="email"></label>
+  <label>Şehir <select name="sehir"><option value="">Seçiniz</option><option>İstanbul</option><option>İzmir</option><option>Ankara</option></select></label>
+  <label>Ön yazı <textarea name="onyazi"></textarea></label>
+  <label><input type="checkbox" name="kvkk"> KVKK metnini okudum</label>
+  <button data-yasak type="submit">Başvuruyu Gönder</button>
+</form></html>
