@@ -1070,3 +1070,21 @@ def test_onceki_gorev_surerken_kullaniciya_soylenir(monkeypatch):
     finally:
         gorev.GOREVLER.pop(bekleyen.id, None)
     assert any(x["tur"] == "anlatim" and "Önceki görev" in x["metin"] for x in o)
+
+
+# ---- Model testi: karşılaştırmada TechStore'un "Show more"u açılmadan bitirildi (not alınmamış sayfa)
+def test_orta_gorevde_acilmamis_daha_fazla_ile_bitirilmez(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "a"},
+               {"eylem": "git", "url": f"{site}/en/shop.html"}, {"eylem": "bitir"}])
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "orta", "min_site": 1, "maks_adim": 20, "plan": [], "inceleme": False})
+    calistir(yerel_tarayici_ac)
+    geri = m.istemler[4].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+    assert "Henüz bitirme" in geri and "Show more" in geri
+
+
+def test_basit_gorevde_acilmamis_daha_fazla_bitirmeyi_engellemez(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "a"},
+               {"eylem": "git", "url": f"{site}/en/shop.html"}, {"eylem": "bitir"}])
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 4

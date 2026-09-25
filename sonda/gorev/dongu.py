@@ -177,6 +177,8 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             eksikler = hafiza_.eksik_notlu()
             if derinlik.get("inceleme"):
                 eksikler += [x for x in hafiza_.eksik_ziyaret() if x not in eksikler]
+            elif derinlik["derinlik"] in ("orta", "derin"):  # karşılaştırma: açılmamış "daha fazla"da seçenek kalmasın
+                eksikler += [x for x in hafiza_.eksik_ziyaret(sadece_acilmamis=True) if x not in eksikler]
             if eksikler and bitir_red < ayar.BITIR_RED_SINIRI and adim_no < maks - 3:
                 bitir_red += 1
                 geri_bildirim = ("Henüz bitirme: not aldığın bazı sayfaları tam incelemedin: "

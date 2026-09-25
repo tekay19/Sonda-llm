@@ -170,10 +170,12 @@ class SayfaHafizasi:
             parca.append("açılmamış " + ", ".join(f"“{a}”" for a in k["acilmamis"]) + " butonu var")
         return " ve ".join(parca)
 
-    def eksik_ziyaret(self):
-        """İnceleme görevleri için: ziyaret edilip tam incelenmeyen sayfalar (arama sonuç sayfaları hariç)."""
-        return [(url, self.eksik(url)) for url in self.sayfalar
-                if not _ARAMA_MOTORU.search(url) and url != "about:blank" and self.eksik(url)]
+    def eksik_ziyaret(self, sadece_acilmamis=False):
+        """Ziyaret edilip tam incelenmeyen sayfalar (arama sonuç sayfaları hariç). sadece_acilmamis: yalnızca
+        açılmamış "daha fazla" butonu olanlar (karşılaştırmalarda gizli seçenek kalmasın)."""
+        return [(url, self.eksik(url)) for url, k in self.sayfalar.items()
+                if not _ARAMA_MOTORU.search(url) and url != "about:blank" and self.eksik(url)
+                and (not sadece_acilmamis or k["acilmamis"])]
 
     def icerik(self, sinir):
         """Görülen sayfa metinleri, en son ziyaret edilenden başlayarak (en fazla sinir karakter)."""
