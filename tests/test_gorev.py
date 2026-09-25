@@ -952,3 +952,23 @@ def test_ayni_sayfa_arka_arkaya_iki_kez_okunmaz(sahte, yerel_tarayici_ac, site):
     o = calistir(yerel_tarayici_ac)
     assert [x["tip"] for x in o if x["tur"] == "adim"].count("incele") == 2  # arada kaydırınca yeniden okunabilir
     assert "zaten okudun" in m.istemler[3].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+
+
+
+# ---- Final inceleme I1: model düşünürken Durdur'a basılırsa gelen eylem uygulanmaz
+def test_karar_sirasinda_durdurulursa_eylem_uygulanmaz(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None, dusun=False):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            for g in list(gorev.GOREVLER.values()):
+                g.komut("durdur")  # kullanıcı model düşünürken Durdur'a bastı
+            return {"eylem": "git", "url": f"{site}/magaza/index.html"}
+        return asil(model, istem, ekran, dusun)
+    gorev.karar.karar_al = akilli
+    o = calistir(yerel_tarayici_ac)
+    assert not any(x["tur"] == "adim" and "127.0.0.1" in x.get("metin", "") and x["tip"] == "gezin"
+                   for x in o[o.index(next(x for x in o if x["tur"] == "adim" and x["tip"] == "gezin")) + 1:])
+    assert [x["durum"] for x in o if x["tur"] == "gorev_bitti"] == ["durduruldu"]

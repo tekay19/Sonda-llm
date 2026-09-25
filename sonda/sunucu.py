@@ -7,6 +7,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from . import gorev, hafiza
@@ -21,6 +22,8 @@ ETIKETLER = {
 }
 
 app = FastAPI()
+# DNS rebinding: kötü niyetli bir web sayfası yerel sunucuya görev yaptıramasın
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
 app.mount("/static", StaticFiles(directory=STATIK), name="static")
 
 

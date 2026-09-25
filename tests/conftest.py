@@ -52,3 +52,13 @@ def tarayici(yerel_tarayici_ac):
 def ihlaller(t):
     """Test sayfalarının localStorage'a yazdığı güvenlik ihlalleri."""
     return t.sayfa.evaluate("JSON.parse(localStorage.getItem('ihlaller') || '[]')")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _gecici_gorev_kayitlari(tmp_path_factory):
+    """Görev hata ayıklama kayıtları testlerde geçici klasöre gider (gerçek kayıtlar silinmesin)."""
+    from sonda.gorev import ayar
+    eski = ayar.KAYIT_KLASORU
+    ayar.KAYIT_KLASORU = tmp_path_factory.mktemp("gorev_kayitlari")
+    yield
+    ayar.KAYIT_KLASORU = eski

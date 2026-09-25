@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from sonda import asistan, gorev, sunucu
 
-istemci = TestClient(sunucu.app)
+istemci = TestClient(sunucu.app, base_url="http://127.0.0.1")
 
 
 def test_bilinmeyen_gorev_komutu():
@@ -97,3 +97,12 @@ def test_diger_modlarda_yonlendirme_yok(monkeypatch):
     monkeypatch.setattr(asistan, "yon_belirle", lambda *a: (_ for _ in ()).throw(AssertionError("çağrılmamalı")))
     monkeypatch.setattr(asistan, "hizli", lambda *a, **k: iter([{"tur": "cevap_bitti", "metin": ""}]))
     assert [o["tur"] for o in asistan.calistir("x", [], "m", "hizli", oneri=False)] == ["bitti"]
+
+
+
+def test_yabanci_host_basligi_reddedilir():
+    """Final inceleme I8: DNS rebinding ile kötü niyetli bir sayfa yerel sunucuya görev yaptıramasın."""
+    assert istemci.get("/api/durum", headers={"host": "kotu-site.com"}).status_code == 400
+    assert istemci.post("/api/sor", json={"soru": "x", "model": "m", "mod": "gorev"},
+                        headers={"host": "kotu-site.com"}).status_code == 400
+    assert istemci.get("/api/durum", headers={"host": "localhost:8765"}).status_code == 200

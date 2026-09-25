@@ -128,6 +128,9 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         karar = kararlar.karar_al(model, istem_metni, ekran, dusun)
         kayit.yaz({"adim": adim_no, "zaman": time.strftime("%H:%M:%S"), "url": sayfa["url"], "dusun": dusun,
                    "ekran": ekran is not None, "istem": istem_metni, "karar": karar})
+        if g.durdu.is_set():  # model düşünürken Durdur'a basıldı: gelen eylem uygulanmaz
+            durum["kod"], durum["hal"] = "durduruldu", "Kullanıcı görevi durdurdu."
+            return
         if karar is None:
             geri_bildirim = "Geçersiz cevap verdin; listedeki eylemlerden birini geçerli JSON olarak döndür."
             adimlar.append(f"{adim_no}. (geçersiz cevap)")

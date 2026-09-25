@@ -24,8 +24,27 @@ _YASAK_BUTON = re.compile(
     r"|\bsiparis(i)? (ver|onayla|tamamla)|alisverisi tamamla|\bgonder|\bbasvur|\bsil\b|\bkaldir"
     r"|hesabi (kapat|sil)|\bonayla|giris yap|oturum ac|uye ol|kayit ol|abone ol"
     r"|\bpay\b|\bbuy\b|purchase|place order|\bcheck ?out\b|\bsubmit|\bsend\b|\bapply\b|\bdelete\b|\bremove\b"
-    r"|\bconfirm|\bsign ?(in|up)\b|\blog ?in\b|\bregister|subscribe")
+    r"|\bconfirm|\bsign ?(in|up)\b|\blog ?in\b|\bregister|subscribe"
+    # gerçek sitelerin son adım etiketleri (final inceleme: Amazon "Siparişinizi verin", "Place your order"...)
+    r"|\bsiparis\w* (ver|onayla|tamamla)|place (your )?order|\b(complete|confirm|submit) (my |your )?(order|purchase|booking|payment)"
+    r"|\border now\b|\bbook now\b|rezervasyon\w* (yap|tamamla|onayla)|\bodeme\w* (devam|gec)|teklif\w* kabul"
+    r"|accept (the )?offer|\bhire\b|\bise al|\bbagis|donate|transfer et|havale|\beft\b|para gonder|send money")
+# Ödeme/sipariş sayfalarında "Devam/Continue" da son adım olabilir (kayıtlı kartla tek tık sipariş)
+_ODEME_ADRESI = re.compile(r"checkout|/odeme|/payment|/buy/|/siparis|place-?order|/sepet/onay|/cart/confirm", re.I)
+_DEVAM = re.compile(r"(devam( et)?|continue|ileri|next|proceed( to [a-z ]+)?)")
 
+_ALAN_ADI = re.compile(r"(?<![@\w.-])((?:[a-z0-9-]+\.)+[a-z]{2,})")
+_UZANTILAR = {"com", "net", "org", "tr", "io", "co", "ai", "dev", "app", "gov", "edu", "info", "biz", "me", "uk", "de",
+              "fr", "nl", "eu", "us", "ca", "au", "ru", "xyz", "shop", "store", "site", "online", "tech", "cloud", "tv"}
+
+
+def _alan_adi_mi(parca):
+    """Gerçek bir uzantıyla biten alan adı mı? ("upwork.com" evet, şifre "Gizli.Sifre-42" hayır)"""
+    m = re.fullmatch(r"(?:[a-z0-9-]+\.)+([a-z]{2,})", parca.lower())
+    return bool(m) and m.group(1) in _UZANTILAR
+
+
+_GIRIS_ALTLARI = {"", "www", "accounts", "account", "login", "auth", "signin", "sso", "id", "secure", "giris", "oturum"}
 _GIRIS_BUTONU = re.compile(r"giris yap|oturum ac|\bsign ?in\b|\blog ?in\b")
 _SIFRE = re.compile(r"sifre|parola|passw")
 _KART_VEYA_KOD = re.compile(r"kart|card|cvv|cvc|\bcsc\b|guvenlik kodu|security code|son kullanma|expir|\biban\b|\bpin\b"
@@ -77,26 +96,33 @@ def yasak_buton(oge):
     return bool(_YASAK_BUTON.search(sade(" ".join(str(oge.get(k) or "") for k in ("metin", "deger", "aria", "baslik")))))
 
 
-def _site_adi(url):
-    """Adresin kayıtlı alan adındaki ayırt edici etiket: www.upwork.com -> upwork, giris.turkiye.gov.tr -> turkiye.
-    IP ve localhost için tam ana makine adı."""
-    host = (urlparse(url).hostname or "").lower()
-    etiketler = host.split(".")
-    if len(etiketler) < 2 or host.replace(".", "").isdigit():
-        return host
-    if len(etiketler) >= 3 and len(etiketler[-1]) == 2 and etiketler[-2] in _IKINCI_SEVIYE:
-        return etiketler[-3]
-    return etiketler[-2]
+def _kayitli_alan(host):
+    """(kayıtlı alan adı, alt alan etiketleri): giris.turkiye.gov.tr -> ("turkiye.gov.tr", ["giris"])."""
+    e = host.split(".")
+    if len(e) >= 3 and len(e[-1]) == 2 and e[-2] in _IKINCI_SEVIYE:
+        return ".".join(e[-3:]), e[:-3]
+    return ".".join(e[-2:]), e[:-2]
 
 
 def _kimlik_gorevi(gorev_metni, url):
-    """Görev şifre veriyor ve şu anki site görevde adıyla geçiyor mu?"""
-    ad = _site_adi(url)
-    if not ad or not _SIFRE.search(sade(gorev_metni)):
+    """Görev şifre veriyor ve şu anki site görevdeki site mi? Tam kayıtlı alan adı karşılaştırılır
+    (upwork.xyz, upwork.com.evil.io ve docs.google.com gibi alt alanlar geçmez)."""
+    host = (urlparse(url).hostname or "").lower()
+    if not host or not _SIFRE.search(sade(gorev_metni)):
         return False
-    if "." in ad or ad == "localhost":
-        return ad in gorev_metni.lower()
-    return bool(re.search(rf"\b{re.escape(ad)}\b", sade(gorev_metni)))
+    metin = gorev_metni.lower()
+    if host == "localhost" or host.replace(".", "").isdigit():
+        return host in metin
+    alan, alt = _kayitli_alan(host)
+    if ".".join(alt) not in _GIRIS_ALTLARI:  # docs., forms., kullanıcı alt alanları: ancak görevde aynen yazıyorsa
+        return host in metin
+    for gizli in gizli_adaylar(gorev_metni):  # "Gizli.Sifre-42" gibi şifreler alan adı sanılmasın
+        metin = metin.replace(gizli.lower(), " ")
+    yazilan = {_kayitli_alan(a)[0] for a in _ALAN_ADI.findall(metin) if _alan_adi_mi(a)}
+    if yazilan:
+        return alan in yazilan
+    etiket = alan.split(".")[0]
+    return alan in (f"{etiket}.com", f"{etiket}.com.tr") and bool(re.search(rf"\b{re.escape(etiket)}\b", sade(gorev_metni)))
 
 
 def _sifre_alani(oge):
@@ -120,7 +146,7 @@ def gizli_adaylar(gorev_metni):
         if not _SIFRE.search(sade(k)):
             continue
         for a in temiz[max(0, i - 3):i] + temiz[i + 1:i + 4]:
-            if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a):
+            if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a) and not _alan_adi_mi(a):
                 adaylar.add(a)
     return adaylar
 
@@ -163,6 +189,8 @@ def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=(
             return Karar(True)
         if yasak_buton(oge):
             return Karar(False, f"🔒 “{oge_adi(oge)}” son adım butonu. Kontrol edip buna sen basmalısın.")
+        if _ODEME_ADRESI.search(url or "") and (_submit_mu(oge) or _DEVAM.fullmatch(sade(oge_adi(oge)))):
+            return Karar(False, f"🔒 Ödeme sayfasında “{oge_adi(oge)}” siparişi tamamlayabilir. Bu adım senin.")
         hassaslar = [f for f in form_ogeleri if hassas_alan(f)]
         if _submit_mu(oge) and hassaslar and not (kimlik and all(_sifre_alani(f) for f in hassaslar)):
             return Karar(False, f"🔒 “{oge_adi(oge)}” kart veya şifre içeren bir formu gönderiyor. Bu adım senin.")

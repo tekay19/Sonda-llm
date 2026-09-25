@@ -261,3 +261,63 @@ def test_eposta_normal_alana_yazilabilir():
 def test_ek_gizliler_de_korunur():
     k = koruma.kontrol({"eylem": "git", "url": "https://x.com/?a=qwerty99"}, gorev_metni="", gizliler={"qwerty99"})
     assert not k.izin
+
+
+
+# ---- Final inceleme C1: gerçek sitelerin son adım etiketleri
+@pytest.mark.parametrize("metin", [
+    "Siparişinizi verin", "Place your order", "Order now", "Complete order", "Confirm purchase", "Book now",
+    "Rezervasyonu tamamla", "Ödemeye devam et", "Teklifi kabul et", "Accept offer", "Hire", "İşe al",
+    "Bağış yap", "Donate", "Transfer et", "Havale yap", "Para gönder", "Send money", "Complete booking",
+])
+def test_gercek_son_adim_etiketleri_engellenir(metin):
+    assert koruma.yasak_buton(buton(metin)), metin
+
+
+@pytest.mark.parametrize("metin", ["Kabul Et", "Tümünü kabul et", "Accept all cookies", "Sepete Ekle", "Kaydet",
+                                   "Siparişlerim", "Order history", "Booking.com"])
+def test_benzer_ama_zararsiz_etiketler_serbest(metin):
+    assert not koruma.yasak_buton(buton(metin)), metin
+
+
+@pytest.mark.parametrize("url", ["https://www.amazon.com.tr/gp/buy/spc/handlers/display.html",
+                                 "https://www.trendyol.com/odeme", "https://shop.example.com/checkout/review"])
+def test_odeme_sayfasinda_devam_butonu_engellenir(url):
+    for metin in ("Devam", "Continue", "İleri", "Proceed"):
+        assert not koruma.kontrol({"eylem": "tikla", "no": 1}, buton(metin), url=url).izin, (url, metin)
+
+
+def test_odeme_sayfasi_disinda_devam_serbest():
+    assert koruma.kontrol({"eylem": "tikla", "no": 1}, buton("Devam"), url="https://www.upwork.com/nx/find-work/").izin
+
+
+# ---- Final inceleme C2: şifre yalnızca gerçekten adı geçen sitede
+@pytest.mark.parametrize("url", ["https://upwork.xyz/login", "https://upwork.net/login", "https://www.upwork.ru/giris",
+                                 "https://upwork.com.evil.io/login"])
+def test_sifre_benzer_alan_adinda_yazilamaz(url):
+    k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Gizli.Sifre-42"}, oge(tip="password"), gorev_metni=GOREV, url=url)
+    assert not k.izin, url
+
+
+def test_sifre_ayni_markanin_baska_alt_alanina_yazilamaz():
+    gorev_ = "google hesabıma gir, şifrem Abc12345!"
+    assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Abc12345!"}, oge(tip="password"), gorev_metni=gorev_,
+                              url="https://docs.google.com/forms/d/e/x/viewform").izin
+    assert koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Abc12345!"}, oge(tip="password"), gorev_metni=gorev_,
+                          url="https://accounts.google.com/signin").izin
+
+
+def test_gorevde_yazan_alan_adi_esas_alinir():
+    gorev_ = "e-devlet (turkiye.gov.tr) şifrem Ed3vlet!9 ile gir"
+    assert koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Ed3vlet!9"}, oge(tip="password"), gorev_metni=gorev_,
+                          url="https://giris.turkiye.gov.tr/Giris/").izin
+    assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Ed3vlet!9"}, oge(tip="password"), gorev_metni=gorev_,
+                              url="https://turkiye-gov.tr/Giris/").izin
+
+
+def test_turk_alan_adi_varsayilan():
+    gorev_ = "trendyol hesabıma gir şifrem Tr3ndy0l!"
+    for url, beklenen in [("https://www.trendyol.com/giris", True), ("https://auth.trendyol.com/login", True),
+                          ("https://trendyol.com.tr/giris", True), ("https://trendyol.shop/giris", False)]:
+        k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Tr3ndy0l!"}, oge(tip="password"), gorev_metni=gorev_, url=url)
+        assert k.izin is beklenen, url
