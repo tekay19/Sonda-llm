@@ -554,3 +554,42 @@ def test_sayfa_sifreyi_adrese_koydurtamaz(sahte, yerel_tarayici_ac, site):
     assert "evil.example" not in "".join(str(x.get("metin", "")) for x in o if x["tur"] == "adim")
     assert "şifre" in m.istemler[2].split("SON EYLEMİN SONUCU:")[1][:200].lower()
     assert not any("Parola-7788" in str(x.get("metin", "")) for x in o)
+
+
+def test_istenen_form_alani_eksikken_devretme_reddedilir(sahte, yerel_tarayici_ac, site):
+    """Model 'KVKK işaretlendi' deyip işaretlemeden devredemez: görevde istenen boş/işaretsiz alanlar hatırlatılır."""
+    metin = (f"{site}/basvuru.html formunu doldur: Ad Soyad Semih Tekay, e-posta semih@ornek.com, "
+             "KVKK kutusunu işaretle. Göndermeden bana bırak.")
+    m = sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}, {"eylem": "sana_birak", "sebep": "bitti"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            satir = next(x for x in istem.splitlines() if "Ad Soyad" in x and x.startswith("["))
+            return {"eylem": "yaz", "no": int(satir[1:satir.index("]")]), "metin": "Semih Tekay"}
+        if len(m.istemler) == 2:
+            m.istemler.append(istem)
+            return {"eylem": "sana_birak", "sebep": "Form dolduruldu, KVKK işaretlendi"}
+        return asil(model, istem, ekran)
+    gorev.karar.karar_al = akilli
+    o = calistir(yerel_tarayici_ac, metin=metin, komutlar=["durdur"])
+    geri = m.istemler[3].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+    assert "KVKK" in geri and "E-posta" in geri and "Ad Soyad" not in geri
+    assert turler(o).count("kullaniciya") == 1  # ikinci denemede devredilir
+
+
+def test_eksik_form_alanlari():
+    from sonda.gorev.sayfa import eksik_form_alanlari
+
+    def g(**k):
+        o = {"no": 1, "etiket": "input", "rol": "", "tip": "text", "ad": "", "kimlik": "", "otomatik": "", "yer": "",
+             "aria": "", "baslik": "", "metin": "", "deger": "", "href": "", "form": 0, "form_eylem": "", "ekranda": True}
+        o.update(k)
+        return o
+    ogeler = [g(metin="Ad Soyad", deger="Semih"), g(metin="E-posta", tip="email"),
+              g(metin="KVKK metnini okudum", tip="checkbox", secili=False),
+              g(metin="Bülten", tip="checkbox", secili=False), g(metin="Şifre", tip="password"),
+              g(etiket="select", tip="", metin="Şehir", deger="Seçiniz"), g(ad="q", tip="search")]
+    eksik = eksik_form_alanlari(ogeler, "Ad Soyad Semih, e-posta x@y.com, şehir İzmir, KVKK işaretle, şifrem abc")
+    assert eksik == ["E-posta", "KVKK metnini okudum", "Şehir"]

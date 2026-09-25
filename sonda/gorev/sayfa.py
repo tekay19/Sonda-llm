@@ -38,6 +38,31 @@ def iki_adim_mi(sayfa):
     return kod_alani and bool(_IKI_ADIM.search(metin))
 
 
+def _bos_secim(deger):
+    d = koruma.sade(deger)
+    return not d or d.startswith(("sec", "select", "choose", "--", "lutfen"))
+
+
+def eksik_form_alanlari(ogeler, gorev_metni):
+    """Görevde adı geçen ama hâlâ boş ya da işaretsiz form alanları (model 'doldurdum' deyip doldurmamış olabilir)."""
+    gorev_ = koruma.sade(gorev_metni)
+    eksik = []
+    for o in ogeler:
+        if o["etiket"] not in ("input", "textarea", "select") or o.get("tip") in ("submit", "button", "search", "image") \
+                or koruma.hassas_alan(o):
+            continue
+        if o.get("tip") in ("checkbox", "radio"):
+            bos = not o.get("secili")
+        elif o["etiket"] == "select":
+            bos = _bos_secim(o.get("deger"))
+        else:
+            bos = not str(o.get("deger") or "").strip()
+        ad = koruma.oge_adi(o)
+        if bos and any(len(k) >= 4 and k in gorev_ for k in koruma.sade(ad).split()):
+            eksik.append(ad[:40])
+    return eksik
+
+
 def oge_satiri(o):
     if o["etiket"] == "input":
         tur = {"checkbox": "onay kutusu", "radio": "seçenek", "submit": "buton", "button": "buton",

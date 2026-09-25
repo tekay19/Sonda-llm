@@ -12,7 +12,7 @@ from . import karar as kararlar
 from .eylemler import adim, uygula
 from .istem import istem
 from .promptlar import DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TAMAM, SONUC_PROMPTU
-from .sayfa import SayfaHafizasi, iki_adim_mi
+from .sayfa import SayfaHafizasi, eksik_form_alanlari, iki_adim_mi
 
 
 def devret(g, sebep, otomatik=None):
@@ -47,7 +47,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     notlar, adimlar, hafiza_ = durum["notlar"], durum["adimlar"], durum["hafiza"]
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
-    yapilan, erken_red = 0, False
+    yapilan, erken_red, form_red = 0, False, False
     for adim_no in range(1, maks + 1):
         if g.durdu.is_set():
             durum["hal"] = "Kullanıcı görevi durdurdu."
@@ -74,6 +74,12 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         e = karar["eylem"]
         dusunce = str(karar.get("dusunce") or "").strip()[:200]
         dusunce_ek = f" — düşünce: {dusunce}" if dusunce else ""
+        if e in ("bitir", "sana_birak") and not form_red and (eksik_alan := eksik_form_alanlari(sayfa["ogeler"], gorev_metni)):
+            form_red = True
+            geri_bildirim = ("Önce görevde istenen şu alanları doldur/işaretle; hâlâ boş ya da işaretsizler: "
+                             + ", ".join(f"“{a}”" for a in eksik_alan) + ". Yapmadığın bir şeyi yapılmış sayma.")
+            adimlar.append(f"{adim_no}. {e} istedi ama istenen form alanları eksikti{dusunce_ek}")
+            continue
         if e == "bitir":
             siteler = sorted({alan_adi(n["url"]) for n in notlar})
             if len(siteler) < derinlik["min_site"] and bitir_red < ayar.BITIR_RED_SINIRI and adim_no < maks - 3:
