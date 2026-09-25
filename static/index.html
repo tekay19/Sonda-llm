@@ -210,6 +210,23 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .imlec::after { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; background: var(--metin); vertical-align: 1px; animation: yanip 1s ease-in-out infinite; }
 @keyframes yanip { 50% { opacity: .2; } }
 .hata-kutu { border: 1px solid var(--hata); color: var(--hata); border-radius: 12px; padding: 10px 14px; font-size: 14px; margin-top: 8px; }
+/* görev: Sonda'nın anlatımı, yazıyor göstergesi, bitiş satırı */
+.anlatim { margin: 2px 0 12px; padding-left: 14px; border-left: 2px solid var(--cizgi); display: grid; gap: 5px; }
+.m-asistan.calisiyor .anlatim { border-left-color: var(--vurgu); }
+.anlatim p { margin: 0; color: var(--soluk); font-size: 14.5px; line-height: 1.55; }
+.anlatim p.son { color: var(--metin); }
+.yaziyor { display: flex; align-items: center; gap: 4px; min-height: 26px; margin: 2px 0 6px; }
+.yaziyor span { width: 6px; height: 6px; border-radius: 50%; background: var(--soluk); animation: zipla 1.2s infinite ease-in-out; }
+.yaziyor span:nth-child(2) { animation-delay: .15s; }
+.yaziyor span:nth-child(3) { animation-delay: .3s; }
+.yaziyor em { font-style: normal; font-size: 13px; color: var(--soluk); margin-left: 8px; }
+@keyframes zipla { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-4px); opacity: 1; } }
+.durum-satiri { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--soluk); margin-top: 14px; }
+.durum-satiri .ik { width: 15px; height: 15px; flex: none; }
+.durum-satiri.tamam .ik { color: var(--vurgu); }
+.durum-satiri.uyari { color: var(--metin); }
+.durum-satiri.uyari .ik { color: var(--hata); }
+.devret-kart h4 { margin: 0 0 4px; font-size: 14px; }
 .devret-kart { border: 1px solid var(--vurgu); background: var(--vurgu-zemin); border-radius: 12px; padding: 12px 14px; margin: 10px 0; font-size: 14px; }
 .devret-kart .sebep { display: flex; gap: 8px; align-items: flex-start; font-weight: 500; }
 .devret-kart .sebep .ik { flex: none; margin-top: 2px; color: var(--vurgu); }
@@ -253,7 +270,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .mod-sec { display: flex; gap: 4px; }
 .mod-sec button {
   display: flex; align-items: center; gap: 6px; border: 1px solid var(--cizgi); background: none; border-radius: 999px;
-  padding: 5px 12px; font-size: 13.5px; color: var(--soluk);
+  padding: 5px 12px; font-size: 13.5px; color: var(--soluk); white-space: nowrap;
 }
 .mod-sec button svg { width: 15px; height: 15px; }
 .mod-sec button:hover { color: var(--metin); }
@@ -336,6 +353,7 @@ svg.ik { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none
 .bildirim.gorunur { opacity: 1; transform: translate(-50%, 0); }
 
 @media (max-width: 860px) {
+  .mod-sec button { padding: 5px 9px; font-size: 13px; gap: 4px; }
   .uygulama, .uygulama.kapali { grid-template-columns: minmax(0, 1fr); }
   .kenar { position: fixed; inset: 0 auto 0 0; width: 284px; z-index: 30; transform: translateX(-100%); transition: transform .2s; visibility: visible !important; }
   .uygulama.mobil-menu .kenar { transform: none; box-shadow: var(--golge); }
@@ -635,10 +653,10 @@ function izOzeti(iz, canli) {
   }
   const aramalar = iz.adimlar.filter(a => a.tip === "ara").length;
   const eylem = iz.adimlar.filter(a => GOREV_TIPLERI.has(a.tip)).length;
-  const parca = [eylem && `${eylem} adım`, aramalar && `${aramalar} arama`, iz.kaynaklar.length && `${iz.kaynaklar.length} kaynak`, iz.sure && `${iz.sure} sn`].filter(Boolean);
+  const parca = [eylem && `${eylem} adım`, aramalar && `${aramalar} arama`, iz.kaynaklar.length && `${iz.kaynaklar.length} kaynak`, sureYaz(iz.sure)].filter(Boolean);
   return kacis(parca.join(", "));
 }
-function izHTML(iz, canli) {
+function izHTML(iz, canli, acik = canli) {
   if (!canli && !iz.adimlar.length) return "";
   const adimlar = iz.adimlar.map(a => {
     const t = ADIM[a.tip] || ADIM.yaz;
@@ -650,7 +668,7 @@ function izHTML(iz, canli) {
     const not = a.not ? ` <span class="adim-not">${kacis(a.not)}</span>` : a.haber ? ` <span class="adim-not">haberler</span>` : "";
     return `<li class="adim ${a.tip}"><div class="adim-ust">${ik(t.ik)}<span class="adim-tip">${t.ad}</span>${not}</div>${govde}</li>`;
   }).join("");
-  return `<details class="iz"${canli ? " open" : ""}><summary>${ik("sag", "ok")}<span class="iz-ozet">${izOzeti(iz, canli)}</span></summary><ol class="adimlar">${adimlar}</ol></details>`;
+  return `<details class="iz"${acik ? " open" : ""}><summary>${ik("sag", "ok")}<span class="iz-ozet">${izOzeti(iz, canli)}</span></summary><ol class="adimlar">${adimlar}</ol></details>`;
 }
 function kaynakSeridi(iz) {
   if (!iz.kaynaklar.length) return "";
@@ -660,6 +678,28 @@ function kaynakSeridi(iz) {
     <a class="kaynak-kart" href="${kacis(k.url)}" target="_blank" rel="noopener">
       <div class="kk-ust">${favImg(k.alan)}<span>${kacis(k.alan)}</span></div><div class="kk-ad">${kacis(k.baslik)}</div></a>`).join("")}
     ${kalan.length ? `<button class="kaynak-kart tumu" data-kaynaklar><span class="favler">${kalan.slice(0, 3).map(k => favImg(k.alan, "")).join("")}</span>+${kalan.length} kaynak</button>` : ""}</div>`;
+}
+function sureYaz(sn) {
+  if (!sn) return "";
+  return sn < 60 ? `${Math.round(sn)} sn` : `${Math.floor(sn / 60)} dk ${Math.round(sn % 60)} sn`;
+}
+// Görev modunda cevabın nasıl bittiğini tek satırla söyler
+const BITIS = {
+  tamamlandi: { ik: "tamam", metin: "Görev tamamlandı", sinif: "tamam" },
+  durduruldu: { ik: "dur", metin: "Görev durduruldu, o ana kadar bulunanlar yukarıda", sinif: "uyari" },
+  adim_siniri: { ik: "plan", metin: "Adım sınırına ulaşıldı, görev yarım kalmış olabilir", sinif: "uyari" },
+  sekme_kapandi: { ik: "kapat", metin: "Sonda'nın sekmesi kapatıldı, görev yarıda kaldı", sinif: "uyari" },
+  zaman_asimi: { ik: "kilit", metin: "Senden yanıt gelmediği için görev bitti", sinif: "uyari" },
+};
+function durumSatiri(m) {
+  if (m.mod !== "gorev") return "";
+  if (m.yon === "sohbet") return `<div class="durum-satiri">${ik("dal")}Tarayıcı açılmadan, konuşmaya bakarak cevaplandı</div>`;
+  if (m.yon === "bilgi") return `<div class="durum-satiri">${ik("ara")}Tarayıcı açılmadan, hızlı web aramasıyla cevaplandı</div>`;
+  const b = BITIS[m.gorevDurum];
+  if (!b) return "";
+  const adim = (m.iz?.adimlar || []).filter(a => GOREV_TIPLERI.has(a.tip)).length;
+  const ek = [adim && `${adim} adım`, sureYaz(m.iz?.sure)].filter(Boolean).join(", ");
+  return `<div class="durum-satiri ${b.sinif}">${ik(b.ik)}${b.metin}${ek ? ` (${ek})` : ""}</div>`;
 }
 function asistanEl(m, indeks) {
   const d = document.createElement("div"); d.className = "m-asistan"; d.dataset.indeks = indeks;
@@ -672,19 +712,24 @@ function asistanGuncelle(d, m, canli) {
   const sonMu = s && Number(d.dataset.indeks) === s.mesajlar.length - 1;
   d.classList.toggle("calisiyor", canli);
   const acikti = $(".iz", d)?.open;
-  $(".govde", d).innerHTML = izHTML(iz, canli)
-    + (canli && m.bekleyen ? `<div class="devret-kart" role="alert"><div class="sebep">${ik("kilit")}<span>${kacis(m.bekleyen.sebep)}</span></div>
+  const gorevMu = m.mod === "gorev";
+  $(".govde", d).innerHTML = izHTML(iz, canli, canli && !gorevMu)
+    + (m.anlatim?.length ? `<div class="anlatim">${m.anlatim.map((a, i) =>
+        `<p${canli && i === m.anlatim.length - 1 ? ' class="son"' : ""}>${kacis(a)}</p>`).join("")}</div>` : "")
+    + (canli && m.bekleyen ? `<div class="devret-kart" role="alert"><h4>Senin sıran</h4><div class="sebep"><span>${kacis(m.bekleyen.sebep)}</span></div>
         <p>Chrome'da Sonda'nın sekmesinde vurgulanan yerde işini bitir, sonra “Devam”a bas. İstersen görevi burada bitirebilirsin.</p>
         <div class="dugmeler"><button type="button" class="birincil" data-gorev="devam">Devam</button><button type="button" data-gorev="durdur">Görevi bitir</button></div></div>` : "")
-    + `<div class="cevap${canli ? " imlec" : ""}">${isle(m.content, new Set(iz.kaynaklar.map(k => String(k.no))))}</div>`
+    + (canli && !m.content && !m.bekleyen ? `<div class="yaziyor" role="status" aria-label="Sonda çalışıyor"><span></span><span></span><span></span>${
+        m.durduruluyor ? "<em>Durduruluyor, o ana kadar bulunanlar özetleniyor</em>" : ""}</div>` : "")
+    + `<div class="cevap${canli && m.content ? " imlec" : ""}">${isle(m.content, new Set(iz.kaynaklar.map(k => String(k.no))))}</div>`
     + (m.hata ? `<div class="hata-kutu">${kacis(m.hata)}</div>` : "")
-    + (canli ? "" : kaynakSeridi(iz) + (sonMu && m.oneriler?.length ? `<div class="takip"><h4>${ik("dal")}İlgili sorular</h4>${m.oneriler.map(o =>
+    + (canli ? "" : kaynakSeridi(iz) + durumSatiri(m) + (sonMu && m.oneriler?.length ? `<div class="takip"><h4>${ik("dal")}İlgili sorular</h4>${m.oneriler.map(o =>
         `<button type="button" data-takip="${kacis(o)}"><span>${kacis(o)}</span>${ik("arti")}</button>`).join("")}</div>` : "")
       + `<div class="m-islemler">
         <button data-kopyala title="Kopyala" aria-label="Kopyala">${ik("kopya")}</button>
         ${sonMu ? `<button data-yenile title="Yeniden oluştur" aria-label="Yeniden oluştur">${ik("yenile")}</button>` : ""}
         ${iz.kaynaklar.length ? `<button data-kaynaklar title="Kaynaklar" aria-label="Kaynaklar">${ik("kitap")}</button>` : ""}
-        <span class="ozet">${{ derin: "Derin araştırma", gorev: "Görev" }[m.mod] || ""}</span></div>`);
+        <span class="ozet">${m.mod === "derin" ? "Derin araştırma" : ""}</span></div>`);
   if (!canli && acikti) $(".iz", d).open = true;
 }
 
@@ -774,7 +819,14 @@ function kutuDurumu() {
 }
 alan.addEventListener("input", () => { alan.style.height = "auto"; alan.style.height = alan.scrollHeight + "px"; kutuDurumu(); });
 alan.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!S.calisiyor) gonder(); } });
-$("#form").onsubmit = e => { e.preventDefault(); if (S.calisiyor) { gorevKomutu("durdur"); S.iptal?.abort(); } else gonder(); };
+$("#form").onsubmit = e => {
+  e.preventDefault();
+  if (!S.calisiyor) return gonder();
+  if (S.gorevId && S.canli) {  // görev: bağlantı açık kalır, Sonda o ana kadar bulduklarını özetler
+    gorevKomutu("durdur");
+    S.canli.m.durduruluyor = true; S.canli.m.bekleyen = null; asistanGuncelle(S.canli.el, S.canli.m, true);
+  } else S.iptal?.abort();
+};
 
 async function gonder() {
   const soru = alan.value.trim();
@@ -805,10 +857,12 @@ async function gonder() {
   asistanGuncelle(aEl, m, true);
   kEl.scrollIntoView({ block: "start", behavior: "smooth" });
 
-  S.calisiyor = true; S.iptal = new AbortController(); kutuDurumu();
-  let bekleyen = false;
+  S.calisiyor = true; S.iptal = new AbortController(); S.canli = { m, el: aEl }; kutuDurumu();
+  let bekleyen = false, bitti = false;
   const ciz = () => { if (bekleyen) return; bekleyen = true; requestAnimationFrame(() => {
-    bekleyen = false; asistanGuncelle(aEl, m, true);
+    bekleyen = false;
+    if (bitti) return;  // akış bittiyse bekleyen canlı çizim, bitmiş halin üstüne yazmasın
+    asistanGuncelle(aEl, m, true);
     const a = $("#akis"); if (a.scrollHeight - a.scrollTop - a.clientHeight < 200) a.scrollTop = a.scrollHeight;
   }); };
 
@@ -836,6 +890,9 @@ async function gonder() {
         else if (o.tur === "gorev_basladi") { m.gorevId = o.id; S.gorevId = o.id; }
         else if (o.tur === "kullaniciya") { m.bekleyen = { sebep: o.sebep }; m.iz.adimlar.push({ tip: "kullanici", metin: o.sebep }); bildir("Sonda seni bekliyor"); }
         else if (o.tur === "devam_edildi") m.bekleyen = null;
+        else if (o.tur === "yon") m.yon = o.hedef;
+        else if (o.tur === "anlatim") (m.anlatim ||= []).push(o.metin);
+        else if (o.tur === "gorev_bitti") m.gorevDurum = o.durum;
         else if (o.tur === "hata") m.hata = `Bir hata oluştu: ${o.metin}.` + (/ollama|connect|model/i.test(o.metin) ? " Ollama'nın açık olduğunu ve seçili modelin indirildiğini kontrol et." : "");
       }
       ciz();
@@ -844,7 +901,9 @@ async function gonder() {
     if (e.name === "AbortError") m.content += m.content ? "\n\n*Durduruldu.*" : "*Durduruldu.*";
     else m.hata = "Sunucuya ulaşılamadı. Sonda'yı baslat.bat ile başlattığından emin ol.";
   }
-  S.calisiyor = false; S.gorevId = null; m.bekleyen = null; kutuDurumu(); kaydet();
+  bitti = true;
+  S.calisiyor = false; S.gorevId = null; S.canli = null; m.bekleyen = null; m.durduruluyor = false; kutuDurumu(); kaydet();
+  if (S.mod === "gorev") alan.placeholder = "Devam et ya da yeni bir görev ver";
   setTimeout(() => hafizaCiz(), 8000);
   if (S.aktif === s.id) {
     asistanGuncelle(aEl, m, false);
