@@ -19,6 +19,10 @@ def _yukle():
 def _yaz(veri):
     DOSYA.parent.mkdir(parents=True, exist_ok=True)
     DOSYA.write_text(json.dumps(veri, ensure_ascii=False, indent=1), encoding="utf-8")
+    try:
+        os.chmod(DOSYA, 0o600)  # anahtar yalnızca sahibine açık (Windows'ta etkisi sınırlı: profil klasörü zaten özel)
+    except OSError:
+        pass
 
 
 def gemini_anahtari():

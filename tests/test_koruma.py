@@ -390,3 +390,8 @@ def test_yer_tutucu_yalnizca_sifre_sozcugunden_sonraki_deger():
 
 def test_yer_tutucu_sozcukten_once_gelen_sifre():
     assert koruma.yer_tutucular("upwork.com'a 'abc12345' şifresiyle gir") == {"{SIFRE_1}": "abc12345"}
+
+
+def test_parola_iceren_sifreden_sonraki_kelime_sifre_sayilmaz():
+    """'Parola-7788' şifrenin kendisi; ardından gelen 'gmail' şifre değil."""
+    assert koruma.gizli_adaylar("upwork.com şifrem Parola-7788, gmail şifresi abc!12345") == {"Parola-7788", "abc!12345"}

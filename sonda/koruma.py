@@ -154,7 +154,8 @@ def _adaylar(gorev_metni):
     temiz = [k.strip("'\"“”‘’.,;:()") for k in str(gorev_metni or "").split()]
     dogrudan, yakin = set(), set()
     for i, k in enumerate(temiz):
-        if not _SIFRE.search(sade(k)):
+        # Yalnızca sözcük olan şifre ifadeleri ("şifrem", "password"); "Parola-7788" şifrenin kendisidir
+        if not _SIFRE.search(sade(k)) or not _KELIME.fullmatch(k):
             continue
         j = i + 1
         while j < len(temiz) and sade(temiz[j]) in ("is", "olarak", ""):

@@ -1190,3 +1190,9 @@ def test_sayfadaki_sifre_istemde_gizlenir(sahte, yerel_tarayici_ac, site, monkey
     monkeypatch.setattr(gorev.dongu, "istem", lambda *a: asil(*a) + "\nSAYFA: Şifre Kedi-1234 hatalı")
     calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sayfasında şifrem Kedi-1234 ile gir")
     assert "Kedi-1234" not in "\n".join(m.istemler) and "SAYFA: Şifre ••• hatalı" in m.istemler[0]
+
+
+# ---- Upwork (Gemini): genel bilgiler de profil kaynağına [1] atfedildi
+def test_sonuc_promptu_genel_bilgiye_kaynak_numarasi_koydurmaz():
+    s = gorev.promptlar.SONUC_PROMPTU.lower()
+    assert "genel bilgi" in s and "numara koyma" in s

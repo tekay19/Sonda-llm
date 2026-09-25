@@ -80,7 +80,8 @@ Görevin durumu: {durum}
 Kullanıcıya Türkçe, net ve kaliteli bir sonuç yaz:
 - Önce doğrudan sonuç: ne bulundu, ne yapıldı. Karşılaştırma varsa Markdown tablo kullan.
 - Notlardaki her bilginin sonuna kaynak numarasını köşeli parantezle yaz: [1]. İngilizce kaynaklardaki bilgiyi
-  Türkçeye çevir.
+  Türkçeye çevir. Sayfada yazmayan genel bilgilere ve kendi yorumlarına numara koyma; bunları "genel bilgi" ya da
+  "değerlendirmem" diye belirt.
 - Kaynaklar birbirini doğruluyorsa belirt; çelişiyorsa açıkça söyle.
 - Kullanıcıya bırakılan, bulunamayan ya da tamamlanamayan kısımları açıkça söyle.
 - Notlarda olmayan bilgiyi uydurma. Sonda kısaca hangi sitelere bakıldığını yaz.

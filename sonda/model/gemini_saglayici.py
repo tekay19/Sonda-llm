@@ -131,13 +131,14 @@ def _cevir(h, anahtar):
         return False, h
     if isinstance(h, errors.APIError):
         mesaj = str(getattr(h, "message", "") or h)
-        if h.code in (401, 403) or (h.code == 400 and re.search(r"api.?key", mesaj, re.I)):
+        kod = h.code or 0
+        if kod in (401, 403) or (kod == 400 and re.search(r"api.?key", mesaj, re.I)):
             return False, ModelHatasi(GECERSIZ)
-        if h.code == 429:
+        if kod == 429:
             return True, ModelHatasi(KOTA)
-        if h.code >= 500:
+        if kod >= 500:
             return True, ModelHatasi(SUNUCU)
-        return False, ModelHatasi(_temizle(f"Gemini isteği reddetti ({h.code}): {mesaj[:200]}", anahtar))
+        return False, ModelHatasi(_temizle(f"Gemini isteği reddetti ({kod or '?'}): {mesaj[:200]}", anahtar))
     if isinstance(h, httpx.TimeoutException):
         return True, ModelHatasi(SUNUCU)
     if isinstance(h, (httpx.TransportError, OSError)):
@@ -146,7 +147,7 @@ def _cevir(h, anahtar):
 
 
 def _dusunme_desteklenmiyor(h):
-    return isinstance(h, errors.ClientError) and h.code == 400 and "thinking" in str(h).lower()
+    return isinstance(h, errors.ClientError) and (h.code or 0) == 400 and "thinking" in str(h).lower()
 
 
 def _dene(islem, anahtar):
@@ -176,7 +177,10 @@ def sohbet(model, mesajlar, akis=False, json=False, dusun=False, araclar=None, s
     anahtar = _anahtar()
     ad = model.removeprefix(GEMINI_ONEKI)
     sistem, icerikler = _icerikler(mesajlar)
-    modeller_ = _istemci(anahtar).models
+    try:
+        modeller_ = _istemci(anahtar).models
+    except Exception as h:
+        raise _cevir(h, anahtar)[1] from None
 
     if not akis:
         def islem(dusunme_ayari):

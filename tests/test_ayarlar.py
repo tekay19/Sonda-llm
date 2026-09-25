@@ -34,3 +34,10 @@ def test_bozuk_dosya_bos_sayilir():
     assert ayarlar.gemini_anahtari() is None
     ayarlar.gemini_kaydet("K")
     assert ayarlar.gemini_anahtari() == "K"
+
+
+def test_anahtar_dosyasi_yalnizca_sahibine_acik(monkeypatch):
+    modlar = []
+    monkeypatch.setattr(ayarlar.os, "chmod", lambda yol, mod: modlar.append((str(yol), mod)))
+    ayarlar.gemini_kaydet("K")
+    assert modlar == [(str(ayarlar.DOSYA), 0o600)]

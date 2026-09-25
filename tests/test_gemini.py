@@ -268,3 +268,20 @@ def test_yalnizca_sistem_mesaji_kullaniciya_tasinir(sahte):
     k = m.cagrilar[0]
     assert [c.role for c in k["contents"]] == ["user"] and k["contents"][0].parts[0].text == "SADECE SİSTEM"
     assert k["config"].system_instruction is None
+
+
+def test_kodsuz_api_hatasi_turkce_mesaj(sahte):
+    """Kütüphane kodsuz bir APIError verirse 'TypeError' yerine anlaşılır mesaj gelmeli."""
+    h = errors.APIError(400, {"error": {"message": "bilinmeyen"}})
+    h.code = None
+    sahte(h)
+    with pytest.raises(ModelHatasi) as e:
+        gs.sohbet("gemini:g", [{"role": "user", "content": "x"}])
+    assert "TypeError" not in str(e.value) and str(e.value).startswith("Gemini")
+
+
+def test_istemci_olusturma_hatasi_cevrilir(sahte, monkeypatch):
+    monkeypatch.setattr(gs, "_istemci", lambda anahtar: (_ for _ in ()).throw(ValueError(f"bad key {ANAHTAR}")))
+    with pytest.raises(ModelHatasi) as e:
+        gs.sohbet("gemini:g", [{"role": "user", "content": "x"}])
+    assert ANAHTAR not in str(e.value)
