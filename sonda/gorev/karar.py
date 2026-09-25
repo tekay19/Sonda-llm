@@ -1,9 +1,8 @@
 """Modelden karar alma: görevin derinliği/planı ve her adımdaki tek eylem (JSON)."""
 import json
 
-import ollama
-
 from .. import hafiza
+from .. import model as saglayici
 from ..ortak import JSON_SECENEKLERI, bugun
 from . import ayar
 from .promptlar import DEGERLENDIRME_PROMPTU, DERINLIK_PROMPTU, SISTEM
@@ -32,10 +31,10 @@ def karar_al(model, istem, ekran=None, dusun=False):
         mesaj = {"role": "user", "content": istem + ek}
         if ekran:
             mesaj["images"] = [ekran]
-        yanit = ollama.chat(model=model, format="json", think=dusun, options=JSON_SECENEKLERI,
-                            messages=[{"role": "system", "content": sistem}, mesaj])
+        yanit = saglayici.sohbet(model, [{"role": "system", "content": sistem}, mesaj], json=True, dusun=dusun,
+                                 secenekler=JSON_SECENEKLERI)
         try:
-            veri = json.loads(yanit.message.content)
+            veri = json.loads(yanit.metin)
         except json.JSONDecodeError:
             veri = None
         hata = dogrula(veri)
@@ -48,10 +47,11 @@ def karar_al(model, istem, ekran=None, dusun=False):
 def derinlik_belirle(model, gorev_metni, onceki):
     """Görevin ne kadar derin araştırılacağını ve planını modele sorar; hatalı cevabı düzeltir."""
     try:
-        yanit = ollama.chat(model=model, format="json", think=False, options=JSON_SECENEKLERI, messages=[
+        yanit = saglayici.sohbet(model, [
             {"role": "system", "content": DERINLIK_PROMPTU.format(tarih=bugun())},
-            {"role": "user", "content": (f"Önceki konuşma:\n{onceki}\n\n" if onceki else "") + f"Görev: {gorev_metni}"}])
-        veri = json.loads(yanit.message.content)
+            {"role": "user", "content": (f"Önceki konuşma:\n{onceki}\n\n" if onceki else "") + f"Görev: {gorev_metni}"}],
+            json=True, secenekler=JSON_SECENEKLERI)
+        veri = json.loads(yanit.metin)
     except Exception:
         veri = {}
     if not isinstance(veri, dict):
@@ -74,10 +74,10 @@ def ilerleme_degerlendir(model, gorev_metni, derinlik, notlar, hafiza_):
               + ("\n".join(f"- {n['metin']}" for n in notlar) or "(yok)")
               + f"\n\nZİYARET EDİLEN SAYFALAR:\n{hafiza_.metin()}")
     try:
-        yanit = ollama.chat(model=model, format="json", think=True, options=JSON_SECENEKLERI, messages=[
+        yanit = saglayici.sohbet(model, [
             {"role": "system", "content": DEGERLENDIRME_PROMPTU.format(tarih=bugun())},
-            {"role": "user", "content": icerik}])
-        veri = json.loads(yanit.message.content)
+            {"role": "user", "content": icerik}], json=True, dusun=True, secenekler=JSON_SECENEKLERI)
+        veri = json.loads(yanit.metin)
     except Exception:
         return {}
     if not isinstance(veri, dict):

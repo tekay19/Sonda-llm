@@ -3,6 +3,7 @@ import threading
 import pytest
 
 from sonda import gorev
+from sonda.model import Parca, Yanit
 
 ORIJINAL_SONUC_YAZ = gorev.dongu.sonuc_yaz
 from conftest import ihlaller
@@ -313,13 +314,11 @@ def test_derinlik_adim_sinirini_belirler(sahte, yerel_tarayici_ac, monkeypatch):
 
 
 def test_derinlik_cevabi_duzeltilir(monkeypatch):
-    class Y:
-        def __init__(self, icerik):
-            self.message = type("M", (), {"content": icerik})()
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
+    Y = Yanit
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y('{"derinlik": "derin", "min_site": 99, "plan": ["a", 3]}'))
     d = gorev.karar.derinlik_belirle("m", "fiyat karşılaştır", "")
     assert d["min_site"] == 5 and d["maks_adim"] == gorev.ayar.ADIM_SINIRI["derin"] and d["plan"] == ["a"]
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y("bozuk"))
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y("bozuk"))
     assert gorev.karar.derinlik_belirle("m", "x", "")["derinlik"] == "orta"
 
 
@@ -710,12 +709,10 @@ def test_more_gecen_normal_metin_tanınmaz(metin):
 
 
 def test_derinlik_inceleme_bayragini_dondurur(monkeypatch):
-    class Y:
-        def __init__(self, icerik):
-            self.message = type("M", (), {"content": icerik})()
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 1, "inceleme": true, "plan": []}'))
+    Y = Yanit
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y('{"derinlik": "derin", "min_site": 1, "inceleme": true, "plan": []}'))
     assert gorev.karar.derinlik_belirle("m", "profilimi incele", "")["inceleme"] is True
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "basit", "min_site": 1}'))
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y('{"derinlik": "basit", "min_site": 1}'))
     assert gorev.karar.derinlik_belirle("m", "dolar kaç", "")["inceleme"] is False
 
 
@@ -751,14 +748,10 @@ def test_gorulen_metin_son_cevaba_ulasir(sahte, yerel_tarayici_ac, site, monkeyp
     monkeypatch.setattr(gorev.dongu, "sonuc_yaz", ORIJINAL_SONUC_YAZ)
     istemler = []
 
-    class P:
-        def __init__(self, c):
-            self.message = type("M", (), {"content": c})()
-
-    def sahte_chat(**k):
-        istemler.append(k["messages"][-1]["content"])
-        return iter([P("ANALİZ")])
-    monkeypatch.setattr(gorev.dongu.ollama, "chat", sahte_chat)
+    def sahte_chat(model, mesajlar, **k):
+        istemler.append(mesajlar[-1]["content"])
+        return iter([Parca("ANALİZ")])
+    monkeypatch.setattr(gorev.dongu.saglayici, "sohbet", sahte_chat)
     calistir(yerel_tarayici_ac)
     assert "Bölüm 1 " in istemler[0] and "Bölüm 30" in istemler[0] and "GÖRÜLEN" in istemler[0]
 
@@ -844,14 +837,12 @@ def test_basit_gorevde_ara_degerlendirme_yok(sahte, yerel_tarayici_ac, site, mon
 
 
 def test_ilerleme_degerlendir_cevabi_duzeltilir(monkeypatch):
-    class Y:
-        def __init__(self, icerik):
-            self.message = type("M", (), {"content": icerik})()
+    Y = Yanit
     from sonda.gorev.sayfa import SayfaHafizasi
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"degerlendirme": "iyi", "plan": ["a", 5, ""]}'))
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y('{"degerlendirme": "iyi", "plan": ["a", 5, ""]}'))
     d = gorev.karar.ilerleme_degerlendir("m", "g", {"derinlik": "orta", "plan": ["x"]}, [], SayfaHafizasi())
     assert d == {"degerlendirme": "iyi", "plan": ["a"]}
-    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y("bozuk"))
+    monkeypatch.setattr(gorev.karar.saglayici, "sohbet", lambda *a, **k: Y("bozuk"))
     assert gorev.karar.ilerleme_degerlendir("m", "g", {"derinlik": "orta", "plan": ["x"]}, [], SayfaHafizasi()) == {}
 
 
@@ -862,14 +853,10 @@ def test_inceleme_sonucu_dusunerek_yazilir(sahte, yerel_tarayici_ac, site, monke
     monkeypatch.setattr(gorev.dongu, "sonuc_yaz", ORIJINAL_SONUC_YAZ)
     dusunme = []
 
-    class P:
-        def __init__(self, c):
-            self.message = type("M", (), {"content": c})()
-
-    def sahte_chat(**k):
-        dusunme.append(k.get("think"))
-        return iter([P("ANALİZ")])
-    monkeypatch.setattr(gorev.dongu.ollama, "chat", sahte_chat)
+    def sahte_chat(model, mesajlar, **k):
+        dusunme.append(k.get("dusun"))
+        return iter([Parca("ANALİZ")])
+    monkeypatch.setattr(gorev.dongu.saglayici, "sohbet", sahte_chat)
     calistir(yerel_tarayici_ac)
     assert dusunme == [True]
 
@@ -1049,13 +1036,6 @@ def test_ayni_alana_farkli_metinle_tekrar_yazmak_takilma_sayilir(sahte, yerel_ta
     sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}] + [{"eylem": "yaz", "no": 1, "metin": f"Semih {i}"} for i in range(8)])
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
     assert "kullaniciya" in turler(o)
-
-
-def test_ollama_cagrilarinin_zaman_siniri_var():
-    import ollama
-
-    from sonda import ortak
-    assert ollama.chat.__self__._client.timeout.read == ortak.OLLAMA_ZAMAN_ASIMI
 
 
 def test_onceki_gorev_surerken_kullaniciya_soylenir(monkeypatch):

@@ -2,7 +2,7 @@
 import json
 from datetime import date
 
-import ollama
+from . import model as saglayici
 
 
 AYLAR = "Ocak Şubat Mart Nisan Mayıs Haziran Temmuz Ağustos Eylül Ekim Kasım Aralık".split()
@@ -12,12 +12,6 @@ GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", 
 
 
 # Tüm çağrılarda aynı bağlam boyutu: değişirse Ollama modeli baştan yükler
-# Ollama çağrılarına zaman sınırı: takılan bir çağrı görev işçisini (ve sonraki tüm görevleri) kilitlemesin.
-# Düşünme modundaki uzun analizler işlemcide dakikalar sürebildiği için sınır cömert.
-OLLAMA_ZAMAN_ASIMI = 900
-_istemci = ollama.Client(timeout=OLLAMA_ZAMAN_ASIMI)
-ollama.chat, ollama.embed, ollama.list, ollama.ps = _istemci.chat, _istemci.embed, _istemci.list, _istemci.ps
-
 SECENEKLER = {"num_ctx": 32768, "temperature": 0.3}
 
 
@@ -33,9 +27,9 @@ def json_sor(model, sistem, kullanici=None):
     mesajlar = [{"role": "system", "content": sistem}]
     if kullanici:
         mesajlar.append({"role": "user", "content": kullanici})
-    yanit = ollama.chat(model=model, format="json", think=False, options=JSON_SECENEKLERI, messages=mesajlar)
+    yanit = saglayici.sohbet(model, mesajlar, json=True, secenekler=JSON_SECENEKLERI)
     try:
-        veri = json.loads(yanit.message.content)
+        veri = json.loads(yanit.metin)
         return veri if isinstance(veri, dict) else {}
     except json.JSONDecodeError:
         return {}

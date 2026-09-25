@@ -1,5 +1,5 @@
 """Derin araştırma modu: alt sorular, eksik bilgi turu ve rapor."""
-import ollama
+from .. import model as saglayici
 
 from .. import hafiza
 from ..ortak import SECENEKLER, bugun, json_sor
@@ -66,12 +66,11 @@ def derin(soru, gecmis, model, onceki_kaynaklar=(), diger_sohbetler=()):
     hafiza_metni = hafiza.istem_metni()
     sistem = RAPOR_PROMPTU.format(tarih=bugun(), bulgular=metin[:60000],
                                   hafiza=f"\n{hafiza_metni}\n" if hafiza_metni else "")
-    akis = ollama.chat(model=model, stream=True, think=False, options=SECENEKLER,
-                       messages=[{"role": "system", "content": sistem}, *gecmis[-4:],
-                                 {"role": "user", "content": soru}])
+    akis = saglayici.sohbet(model, [{"role": "system", "content": sistem}, *gecmis[-4:],
+                                    {"role": "user", "content": soru}], akis=True, secenekler=SECENEKLER)
     rapor = ""
     for parca in akis:
-        if parca.message.content:
-            rapor += parca.message.content
-            yield {"tur": "token", "metin": parca.message.content}
+        if parca.metin:
+            rapor += parca.metin
+            yield {"tur": "token", "metin": parca.metin}
     yield {"tur": "cevap_bitti", "metin": rapor}

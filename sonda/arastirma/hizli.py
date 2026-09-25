@@ -1,5 +1,5 @@
 """Hızlı mod: arama kararı, en iyi sayfaları okuma ve araç döngüsü."""
-import ollama
+from .. import model as saglayici
 
 from ..ortak import SECENEKLER, bugun, json_sor
 from .araclar import ARACLAR, arac_calistir
@@ -58,18 +58,17 @@ def _dongu(mesajlar, soru, model, dusunme, kaynaklar):
     """Ajan döngüsü: model gerekirse ek arama, okuma veya hesap yapar."""
     for tur in range(MAKS_ARAC_TURU + 1):
         son_tur = tur == MAKS_ARAC_TURU
-        akis = ollama.chat(model=model, messages=mesajlar, stream=True, think=dusunme,
-                           tools=None if son_tur else ARACLAR, options=SECENEKLER)
+        akis = saglayici.sohbet(model, mesajlar, akis=True, dusun=dusunme,
+                                araclar=None if son_tur else ARACLAR, secenekler=SECENEKLER)
         icerik, cagrilar, dusundu = "", [], False
         for parca in akis:
-            if getattr(parca.message, "thinking", None) and not dusundu:
+            if parca.dusunce and not dusundu:
                 dusundu = True
                 yield {"tur": "adim", "tip": "dusun", "metin": "Adım adım akıl yürütüyor"}
-            if parca.message.content:
-                icerik += parca.message.content
-                yield {"tur": "token", "metin": parca.message.content}
-            if parca.message.tool_calls:
-                cagrilar.extend(parca.message.tool_calls)
+            if parca.metin:
+                icerik += parca.metin
+                yield {"tur": "token", "metin": parca.metin}
+            cagrilar.extend(parca.arac_cagrilari)
         if not cagrilar:
             yield from kaynaklar.atiflari_ekle(icerik)
             yield {"tur": "cevap_bitti", "metin": icerik}
@@ -77,9 +76,8 @@ def _dongu(mesajlar, soru, model, dusunme, kaynaklar):
         if icerik:
             yield {"tur": "sifirla"}
         mesajlar.append({"role": "assistant", "content": icerik, "tool_calls": [
-            {"function": {"name": c.function.name, "arguments": dict(c.function.arguments)}}
-            for c in cagrilar]})
+            {"function": {"name": c.ad, "arguments": c.argumanlar}, "imza": c.imza} for c in cagrilar]})
         for c in cagrilar:
-            sonuc, olaylar = arac_calistir(c.function.name, dict(c.function.arguments), soru, kaynaklar)
+            sonuc, olaylar = arac_calistir(c.ad, dict(c.argumanlar), soru, kaynaklar)
             yield from olaylar
-            mesajlar.append({"role": "tool", "content": sonuc[:16000], "tool_name": c.function.name})
+            mesajlar.append({"role": "tool", "content": sonuc[:16000], "tool_name": c.ad})

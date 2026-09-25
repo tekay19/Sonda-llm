@@ -2,9 +2,8 @@
 import json
 import time
 
-import ollama
-
 from .. import koruma, tarayici
+from .. import model as saglayici
 from ..arastirma.kaynaklar import Kaynaklar
 from ..ortak import SECENEKLER, bugun
 from ..web import alan_adi
@@ -322,11 +321,11 @@ def sonuc_yaz(model, gorev_metni, durum):
     cevap = ""
     derinlik = durum.get("derinlik") or {}
     dusun = bool(derinlik.get("inceleme") or derinlik.get("derinlik") == "derin")  # analizde önce düşün
-    for parca in ollama.chat(model=model, stream=True, think=dusun, options=SECENEKLER,
-                             messages=[{"role": "user", "content": istem}]):
-        if parca.message.content:
-            cevap += parca.message.content
-            yield {"tur": "token", "metin": parca.message.content}
+    for parca in saglayici.sohbet(model, [{"role": "user", "content": istem}], akis=True, dusun=dusun,
+                                  secenekler=SECENEKLER):
+        if parca.metin:
+            cevap += parca.metin
+            yield {"tur": "token", "metin": parca.metin}
     yield {"tur": "cevap_bitti", "metin": cevap}
 
 
