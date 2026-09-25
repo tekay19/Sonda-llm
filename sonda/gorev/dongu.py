@@ -27,8 +27,11 @@ def dusunmeli(derinlik, adim_no, geri_bildirim):
     return bool(ayar.DUSUNME_ARALIGI) and derinlik["derinlik"] == "derin" and adim_no % ayar.DUSUNME_ARALIGI == 1
 
 
-def devret(g, sebep, otomatik=None):
+def devret(g, sebep, otomatik=None, gizliler=()):
     g.temizle()
+    for gizli in gizliler:  # modelin yazdığı sebepte şifre geçebilir
+        if len(gizli) >= 4:
+            sebep = sebep.replace(gizli, "•••")
     yield {"tur": "kullaniciya", "id": g.id, "sebep": sebep}
     komut = "durdur" if g.durdu.is_set() else g.bekle(otomatik)
     yield {"tur": "devam_edildi", "komut": komut}
@@ -95,7 +98,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         if iki_adim_mi(sayfa):
             yield adim("engel", "İki adımlı doğrulama bekleniyor")
             adimlar.append(f"{adim_no}. iki adımlı doğrulama (2FA) kullanıcıya bırakıldı")
-            komut = yield from devret(g, IKI_ADIM_SEBEBI, otomatik=lambda: not iki_adim_mi(t.bak()))
+            komut = yield from devret(g, IKI_ADIM_SEBEBI, otomatik=lambda: not iki_adim_mi(t.bak()), gizliler=durum["gizli"])
             if komut not in ("devam", "otomatik"):
                 durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                 else "Kullanıcı 15 dakika içinde doğrulamayı yapmadığı için görev bitti.")
@@ -113,7 +116,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             geri_bildirim = "Robot doğrulaması geçildi; kaldığın yerden devam et."
             if sayfa.get("captcha"):
                 adimlar.append(f"{adim_no}. robot doğrulaması kullanıcıya bırakıldı")
-                komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"))
+                komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"), gizliler=durum["gizli"])
                 if komut not in ("devam", "otomatik"):
                     durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                     else "Robot doğrulaması 15 dakika içinde yapılmadığı için görev bitti.")
@@ -219,7 +222,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         if sebep:
             if e == "sana_birak" or tekrar >= ayar.TAKILMA_DEVRET:
                 adimlar.append(f"{adim_no}. kullanıcıya bırakıldı: {sebep[:100]}")
-            komut = yield from devret(g, sebep)
+            komut = yield from devret(g, sebep, gizliler=durum["gizli"])
             if komut != "devam":
                 durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                 else "Kullanıcı 15 dakika yanıt vermediği için görev bitti.")
@@ -236,7 +239,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             if onaylandi:
                 t.sayfa.wait_for_timeout(int(ayar.CAPTCHA_BEKLE * 1000))
                 if t.bak().get("captcha"):  # resimli bulmaca: kullanıcı çözer, bitince otomatik devam
-                    komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"))
+                    komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"), gizliler=durum["gizli"])
                     if komut not in ("devam", "otomatik"):
                         durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                         else "Robot doğrulaması 15 dakika içinde çözülmediği için görev bitti.")

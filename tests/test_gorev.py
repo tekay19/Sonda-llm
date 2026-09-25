@@ -972,3 +972,24 @@ def test_karar_sirasinda_durdurulursa_eylem_uygulanmaz(sahte, yerel_tarayici_ac,
     assert not any(x["tur"] == "adim" and "127.0.0.1" in x.get("metin", "") and x["tip"] == "gezin"
                    for x in o[o.index(next(x for x in o if x["tur"] == "adim" and x["tip"] == "gezin")) + 1:])
     assert [x["durum"] for x in o if x["tur"] == "gorev_bitti"] == ["durduruldu"]
+
+
+# ---- Model testi: onay kutusu '= "on"' gösterildiği için model işaretli sandı
+def test_onay_kutusu_durumu_acikca_gosterilir():
+    from sonda.gorev.sayfa import oge_satiri
+    temel = {"no": 5, "etiket": "input", "rol": "", "tip": "checkbox", "ad": "kvkk", "kimlik": "", "otomatik": "",
+             "yer": "", "aria": "", "baslik": "", "metin": "KVKK metnini okudum", "deger": "on", "href": "", "form": 0,
+             "form_eylem": "", "ekranda": True}
+    kapali = oge_satiri({**temel, "secili": False})
+    acik = oge_satiri({**temel, "secili": True})
+    assert "(işaretsiz)" in kapali and '"on"' not in kapali
+    assert "(işaretli)" in acik and '"on"' not in acik
+
+
+# ---- Model testi: devretme mesajında şifre açık yazıldı
+def test_devretme_sebebinde_sifre_gizlenir(sahte, yerel_tarayici_ac, site):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"},
+           {"eylem": "sana_birak", "sebep": "semih@ornek.com / Parola-7788 ile giriş olmadı"}])
+    o = calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sayfasında şifrem Parola-7788 ile gir", komutlar=["durdur"])
+    sebep = next(x["sebep"] for x in o if x["tur"] == "kullaniciya")
+    assert "Parola-7788" not in sebep and "•••" in sebep

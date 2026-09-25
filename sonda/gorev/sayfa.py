@@ -92,12 +92,13 @@ def oge_satiri(o, sayfa_url=""):
     if o["etiket"] == "a" and o.get("href") and (hedef := _kisa_adres(o["href"], sayfa_url)):
         satir += f" → {hedef}"  # "Uma" (asistan) ile profil bağlantısını adresinden ayırt edebilsin
     hassas = koruma.hassas_alan(o) if o["etiket"] in ("input", "textarea", "select") else False
-    if o["deger"] and tur not in ("buton",):
+    if tur in ("onay kutusu", "seçenek"):
+        # value="on" işaretli demek değildir; model yanılmasın (KVKK kutusu işaretlendi sanıldı)
+        satir += " (işaretli)" if o.get("secili") else " (işaretsiz)"
+    elif o["deger"] and tur not in ("buton",):
         satir += ' = "***"' if hassas else f' = "{o["deger"][:60]}"'
     if o.get("secenekler"):
         satir += " seçenekler: " + " | ".join(o["secenekler"][:12])
-    if o.get("secili"):
-        satir += " (işaretli)"
     if hassas:
         satir += " 🔒kullanıcının"
     elif tur in ("buton", "bağlantı") and _daha_fazla_mi(o):
