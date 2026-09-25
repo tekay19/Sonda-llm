@@ -5,6 +5,7 @@ import time
 from .. import koruma, tarayici
 from .. import model as saglayici
 from ..arastirma.kaynaklar import Kaynaklar
+from ..model import ModelHatasi
 from ..ortak import SECENEKLER, bugun
 from ..web import alan_adi
 from . import ayar
@@ -304,6 +305,14 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     durum["kod"], durum["hal"] = "adim_siniri", f"Adım sınırı ({maks}) doldu; görev yarım kalmış olabilir."
 
 
+def duz_sonuc(durum, satirlar):
+    """Model kullanılamadığında cevap: durum ve numaralı notlar düz liste (notlar kaybolmasın)."""
+    metin = durum["hal"]
+    if satirlar:
+        metin += "\n\nO ana kadar aldığım notlar:\n" + "\n".join(f"- {s}" for s in satirlar)
+    return metin
+
+
 def sonuc_yaz(model, gorev_metni, durum):
     kaynaklar = Kaynaklar()
     satirlar = []
@@ -312,6 +321,11 @@ def sonuc_yaz(model, gorev_metni, durum):
         if olay:
             yield olay
         satirlar.append(f"[{no}] {n['metin']}")
+    if durum.get("kod") == "hata":
+        cevap = duz_sonuc(durum, satirlar)
+        yield {"tur": "token", "metin": cevap}
+        yield {"tur": "cevap_bitti", "metin": cevap}
+        return
     for gizli in durum.get("gizli", ()):
         gorev_metni = gorev_metni.replace(gizli, "•••")
     istem = SONUC_PROMPTU.format(tarih=bugun(), durum=durum["hal"], gorev=gorev_metni, sonuc=durum["sonuc"] or "(yok)",
@@ -321,11 +335,17 @@ def sonuc_yaz(model, gorev_metni, durum):
     cevap = ""
     derinlik = durum.get("derinlik") or {}
     dusun = bool(derinlik.get("inceleme") or derinlik.get("derinlik") == "derin")  # analizde önce düşün
-    for parca in saglayici.sohbet(model, [{"role": "user", "content": istem}], akis=True, dusun=dusun,
-                                  secenekler=SECENEKLER):
-        if parca.metin:
-            cevap += parca.metin
-            yield {"tur": "token", "metin": parca.metin}
+    try:
+        for parca in saglayici.sohbet(model, [{"role": "user", "content": istem}], akis=True, dusun=dusun,
+                                      secenekler=SECENEKLER):
+            if parca.metin:
+                cevap += parca.metin
+                yield {"tur": "token", "metin": parca.metin}
+    except ModelHatasi as h:
+        durum["hal"] = f"{durum['hal']} Sonuç yazılırken: {h}"
+        ek = ("\n\n" if cevap else "") + duz_sonuc(durum, satirlar)
+        cevap += ek
+        yield {"tur": "token", "metin": ek}
     yield {"tur": "cevap_bitti", "metin": cevap}
 
 
@@ -353,6 +373,9 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
     except tarayici.SekmeKapandi:
         yield adim("hata", "Sonda'nın sekmesi kapatıldı, görev durdu")
         durum["kod"], durum["hal"] = "sekme_kapandi", "Sonda'nın sekmesi kapatıldığı için görev yarıda kaldı."
+    except ModelHatasi as h:
+        yield adim("hata", str(h))
+        durum["kod"], durum["hal"] = "hata", str(h)
     finally:
         try:
             t.kapat()

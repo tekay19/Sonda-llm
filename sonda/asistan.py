@@ -13,6 +13,7 @@ import time
 from . import gorev, hafiza
 from .arastirma import derin, hizli, sohbet
 from .arastirma.promptlar import HAFIZA_PROMPTU, ONERI_PROMPTU
+from .model import ModelHatasi
 from .ortak import json_sor
 from .yonlendirme import yon_belirle
 
@@ -26,7 +27,10 @@ _KISISEL = re.compile(r"\b(ben|benim|bana|beni|bende|adım|ismim|hatırla|unutma
 def oneriler(model, soru, cevap):
     if len(cevap) < 80:
         return
-    veri = json_sor(model, ONERI_PROMPTU.format(soru=soru, cevap=cevap[:3000]))
+    try:
+        veri = json_sor(model, ONERI_PROMPTU.format(soru=soru, cevap=cevap[:3000]))
+    except ModelHatasi:
+        return  # cevap zaten verildi; öneri eksikliği hata sayılmaz
     oneriler = [o for o in veri.get("oneriler", []) if isinstance(o, str) and o.strip()][:3]
     if oneriler:
         yield {"tur": "oneriler", "liste": oneriler}
@@ -78,6 +82,8 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
         yield {"tur": "bitti", "sure": round(time.time() - basla, 1)}
         if oneri:
             yield from oneriler(model, soru, cevap)
+    except ModelHatasi as e:
+        yield {"tur": "hata", "metin": str(e), "bulut": True}
     except Exception as e:
         yield {"tur": "hata", "metin": f"{type(e).__name__}: {e}"}
     finally:

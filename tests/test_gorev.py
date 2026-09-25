@@ -1068,3 +1068,37 @@ def test_basit_gorevde_acilmamis_daha_fazla_bitirmeyi_engellemez(sahte, yerel_ta
                {"eylem": "git", "url": f"{site}/en/shop.html"}, {"eylem": "bitir"}])
     calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 4
+
+
+# ---- Gemini: görev sırasında model hatası notları kaybettirmez
+def test_gorevde_model_hatasi_notlari_korur(sahte, yerel_tarayici_ac, site, monkeypatch):
+    from sonda.model import ModelHatasi
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "Giriş formu var"}])
+    asil = m.__call__
+
+    def kota(model, istem, ekran=None, dusun=False):
+        if len(m.istemler) == 2:
+            raise ModelHatasi("Gemini istek sınırı/kotası doldu; biraz bekle ya da yerel modele geç.")
+        return asil(model, istem, ekran, dusun)
+    monkeypatch.setattr(gorev.karar, "karar_al", kota)
+    monkeypatch.setattr(gorev.dongu, "sonuc_yaz", ORIJINAL_SONUC_YAZ)  # modelsiz yol gerçek fonksiyonda
+    o = calistir(yerel_tarayici_ac)
+    assert {"tur": "gorev_bitti", "durum": "hata"} in o
+    cevap = "".join(x["metin"] for x in o if x["tur"] == "token")
+    assert "kotası doldu" in cevap and "Giriş formu var" in cevap
+    assert not any(x["tur"] == "hata" for x in o)
+
+
+def test_sonuc_yazarken_model_hatasi(monkeypatch):
+    from sonda.gorev.sayfa import SayfaHafizasi
+    from sonda.model import ModelHatasi
+
+    def patla(*a, **k):
+        raise ModelHatasi("Gemini şu an yanıt vermiyor.")
+    monkeypatch.setattr(gorev.dongu.saglayici, "sohbet", patla)
+    durum = {"notlar": [{"metin": "SSD 2.649 TL", "url": "https://a.com/x", "baslik": "A"}], "adimlar": [],
+             "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "Görev tamamlandı.", "gizli": set()}
+    o = list(ORIJINAL_SONUC_YAZ("m", "ssd bul", durum))
+    metin = "".join(x["metin"] for x in o if x["tur"] == "token")
+    assert "yanıt vermiyor" in metin and "[1] SSD 2.649 TL" in metin
+    assert o[-1]["tur"] == "cevap_bitti"

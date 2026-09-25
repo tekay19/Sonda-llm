@@ -106,3 +106,75 @@ def test_yabanci_host_basligi_reddedilir():
     assert istemci.post("/api/sor", json={"soru": "x", "model": "m", "mod": "gorev"},
                         headers={"host": "kotu-site.com"}).status_code == 400
     assert istemci.get("/api/durum", headers={"host": "localhost:8765"}).status_code == 200
+
+
+# ---- Gemini: ayarlar ve model listesi
+import pytest
+
+from sonda import ayarlar, yonlendirme
+from sonda.model import ModelHatasi, gemini_saglayici
+
+
+@pytest.fixture
+def gecici_ayar(tmp_path, monkeypatch):
+    monkeypatch.setattr(ayarlar, "DOSYA", tmp_path / "ayarlar.json")
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+
+
+def test_ayarlar_anahtarin_tamamini_dondurmez(gecici_ayar, monkeypatch):
+    assert istemci.get("/api/ayarlar").json() == {"gemini": {"var": False, "son4": ""}}
+    monkeypatch.setattr(gemini_saglayici, "anahtar_dogrula", lambda a: None)
+    r = istemci.post("/api/ayarlar/gemini", json={"anahtar": "AIzaGIZLIGIZLIabcd"})
+    assert r.json() == {"tamam": True, "son4": "…abcd"}
+    govde = istemci.get("/api/ayarlar").json()
+    assert govde == {"gemini": {"var": True, "son4": "…abcd"}}
+    assert istemci.delete("/api/ayarlar/gemini").json() == {"tamam": True}
+    assert ayarlar.gemini_anahtari() is None
+
+
+def test_gecersiz_anahtar_kaydedilmez(gecici_ayar, monkeypatch):
+    def red(a):
+        raise ModelHatasi("Gemini anahtarı geçersiz ya da yetkisiz. Ayarlar'dan kontrol et.")
+    monkeypatch.setattr(gemini_saglayici, "anahtar_dogrula", red)
+    r = istemci.post("/api/ayarlar/gemini", json={"anahtar": "YANLIS"})
+    assert r.status_code == 400 and "geçersiz" in r.json()["detail"] and "YANLIS" not in r.text
+    assert ayarlar.gemini_anahtari() is None
+
+
+def test_bos_anahtar_reddedilir(gecici_ayar):
+    assert istemci.post("/api/ayarlar/gemini", json={"anahtar": "  "}).status_code == 400
+
+
+def test_modeller_gemini_ekler(monkeypatch):
+    monkeypatch.setattr(sunucu.ollama, "list", lambda: type("L", (), {"models": [type("M", (), {"model": "qwen2.5:7b"})()]})())
+    monkeypatch.setattr(gemini_saglayici, "modeller", lambda: [{"ad": "gemini:gemini-flash-latest", "etiket": "E"}])
+    assert [m["ad"] for m in istemci.get("/api/modeller").json()] == ["qwen2.5:7b", "gemini:gemini-flash-latest"]
+
+
+def test_ollama_kapaliyken_gemini_yine_listelenir(monkeypatch):
+    monkeypatch.setattr(sunucu.ollama, "list", lambda: (_ for _ in ()).throw(ConnectionError()))
+    monkeypatch.setattr(gemini_saglayici, "modeller", lambda: [{"ad": "gemini:x", "etiket": "E"}])
+    assert [m["ad"] for m in istemci.get("/api/modeller").json()] == ["gemini:x"]
+
+
+def test_model_hatasi_turkce_mesajla_akar(monkeypatch):
+    def patla(*a, **k):
+        raise ModelHatasi("Gemini şu an yanıt vermiyor.")
+        yield
+    monkeypatch.setattr(asistan, "hizli", patla)
+    monkeypatch.setattr(asistan, "hafizayi_guncelle", lambda *a: None)
+    olaylar = list(asistan.calistir("soru", [], "gemini:x", "hizli"))
+    assert olaylar[-1] == {"tur": "hata", "metin": "Gemini şu an yanıt vermiyor.", "bulut": True}
+
+
+def test_oneri_uretirken_model_hatasi_sessiz(monkeypatch):
+    monkeypatch.setattr(asistan, "hizli", lambda *a, **k: iter([{"tur": "cevap_bitti", "metin": "x" * 100}]))
+    monkeypatch.setattr(asistan, "hafizayi_guncelle", lambda *a: None)
+    monkeypatch.setattr(asistan, "json_sor", lambda *a: (_ for _ in ()).throw(ModelHatasi("kota")))
+    assert [o["tur"] for o in asistan.calistir("s", [], "gemini:x", "hizli")] == ["bitti"]
+
+
+def test_yonlendirme_model_hatasini_yutmaz(monkeypatch):
+    monkeypatch.setattr(yonlendirme, "json_sor", lambda *a: (_ for _ in ()).throw(ModelHatasi("kota")))
+    with pytest.raises(ModelHatasi):
+        yonlendirme.yon_belirle("m", "x", [])

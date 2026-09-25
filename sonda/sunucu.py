@@ -10,8 +10,9 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
-from . import gorev, hafiza
+from . import ayarlar, gorev, hafiza
 from .asistan import baslik_uret, calistir
+from .model import ModelHatasi, gemini_saglayici
 
 STATIK = Path(__file__).resolve().parent.parent / "static"
 TERCIH_SIRASI = ["qwen3.6:35b-a3b", "qwen3.8:27b", "qwen2.5:7b"]
@@ -46,8 +47,9 @@ def modeller():
     try:
         kurulu = {m.model for m in ollama.list().models}
     except Exception:
-        return []
-    return [{"ad": ad, "etiket": ETIKETLER[ad]} for ad in TERCIH_SIRASI if ad in kurulu]
+        kurulu = set()  # Ollama kapalı olsa da bulut modeller seçilebilsin
+    yerel = [{"ad": ad, "etiket": ETIKETLER[ad]} for ad in TERCIH_SIRASI if ad in kurulu]
+    return yerel + gemini_saglayici.modeller()
 
 
 class BaslikIstegi(BaseModel):
@@ -77,6 +79,40 @@ def hafiza_sil(kimlik: str):
 @app.delete("/api/hafiza")
 def hafiza_temizle():
     hafiza.sil()
+    return {"tamam": True}
+
+
+def _son4(anahtar):
+    return f"…{anahtar[-4:]}" if anahtar else ""
+
+
+@app.get("/api/ayarlar")
+def ayar_durumu():
+    anahtar = ayarlar.gemini_anahtari()  # tamamı hiçbir yanıtta dönmez
+    return {"gemini": {"var": bool(anahtar), "son4": _son4(anahtar)}}
+
+
+class AnahtarIstegi(BaseModel):
+    anahtar: str
+
+
+@app.post("/api/ayarlar/gemini")
+def gemini_kaydet(istek: AnahtarIstegi):
+    anahtar = istek.anahtar.strip()
+    if not anahtar:
+        raise HTTPException(400, "Anahtar boş olamaz.")
+    try:
+        gemini_saglayici.anahtar_dogrula(anahtar)
+    except ModelHatasi as h:
+        raise HTTPException(400, str(h))
+    ayarlar.gemini_kaydet(anahtar)
+    gemini_saglayici._model_onbellegi.clear()
+    return {"tamam": True, "son4": _son4(anahtar)}
+
+
+@app.delete("/api/ayarlar/gemini")
+def gemini_sil():
+    ayarlar.gemini_sil()
     return {"tamam": True}
 
 
