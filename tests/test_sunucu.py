@@ -178,3 +178,20 @@ def test_yonlendirme_model_hatasini_yutmaz(monkeypatch):
     monkeypatch.setattr(yonlendirme, "json_sor", lambda *a: (_ for _ in ()).throw(ModelHatasi("kota")))
     with pytest.raises(ModelHatasi):
         yonlendirme.yon_belirle("m", "x", [])
+
+
+def test_yonlendirme_ve_gecmis_sifreyi_gormez(monkeypatch):
+    gorulen = []
+    monkeypatch.setattr(asistan, "hafizayi_guncelle", lambda *a: None)
+    monkeypatch.setattr(asistan, "yon_belirle", lambda model, soru, gecmis: gorulen.append((soru, gecmis)) or "sohbet")
+    monkeypatch.setattr(asistan, "sohbet", lambda soru, gecmis, *a: gorulen.append((soru, gecmis)) or iter([]))
+    list(asistan.calistir("upwork şifrem Parola-7788 ile gir", [{"role": "user", "content": "şifrem Gizli-4455"}],
+                          "gemini:x", "gorev"))
+    assert gorulen and "Parola-7788" not in repr(gorulen) and "Gizli-4455" not in repr(gorulen)
+
+
+def test_baslik_sifreyi_gormez(monkeypatch):
+    gorulen = []
+    monkeypatch.setattr(sunucu, "baslik_uret", lambda model, soru: gorulen.append(soru) or "Başlık")
+    istemci.post("/api/baslik", json={"soru": "upwork şifrem Parola-7788 ile gir", "model": "gemini:x"})
+    assert gorulen and "Parola-7788" not in gorulen[0]

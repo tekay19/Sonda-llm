@@ -11,7 +11,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
 
 from . import ayarlar, gorev, hafiza
-from .asistan import baslik_uret, calistir
+from .asistan import baslik_uret, calistir, sifresiz
 from .model import ModelHatasi, gemini_saglayici
 
 STATIK = Path(__file__).resolve().parent.parent / "static"
@@ -60,7 +60,7 @@ class BaslikIstegi(BaseModel):
 @app.post("/api/baslik")
 def baslik(istek: BaslikIstegi):
     try:
-        return {"baslik": baslik_uret(istek.model, istek.soru)}
+        return {"baslik": baslik_uret(istek.model, sifresiz(istek.soru))}
     except Exception:
         return {"baslik": istek.soru[:60]}
 

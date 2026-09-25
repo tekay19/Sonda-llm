@@ -367,3 +367,17 @@ def test_enter_yalin_arama_formunda_calisir():
     arama = oge(tip="search", ad="q", form=0)
     k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "x", "enter": True}, arama, [arama])
     assert k.enter
+
+
+def test_yer_tutucular_sirayla():
+    h = koruma.yer_tutucular("upwork.com şifrem Gizli-7788, gmail şifresi abc!12345 olsun")
+    assert h == {"{SIFRE_1}": "Gizli-7788", "{SIFRE_2}": "abc!12345"}
+
+
+def test_yer_tut_metni_degistirir():
+    h = {"{SIFRE_1}": "Parola-7788"}
+    assert koruma.yer_tut("şifrem Parola-7788 ile gir, parola-7788", h) == "şifrem {SIFRE_1} ile gir, {SIFRE_1}"
+
+
+def test_sifre_yoksa_bos_harita():
+    assert koruma.yer_tutucular("en ucuz ssd'yi bul") == {}

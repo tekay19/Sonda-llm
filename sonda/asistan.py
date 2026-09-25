@@ -10,7 +10,7 @@ import re
 import threading
 import time
 
-from . import gorev, hafiza
+from . import gorev, hafiza, koruma
 from .arastirma import derin, hizli, sohbet
 from .arastirma.promptlar import HAFIZA_PROMPTU, ONERI_PROMPTU
 from .model import ModelHatasi
@@ -22,6 +22,11 @@ from .yonlendirme import yon_belirle
 _KISISEL = re.compile(r"\b(ben|benim|bana|beni|bende|adım|ismim|hatırla|unutma|bizim|eşim|oğlum|kızım)\b|"
                       r"\w+(ıyorum|iyorum|uyorum|üyorum|yorum|dım|dim|dum|düm|tım|tim|tum|tüm|ım|im|um|üm)\b",
                       re.IGNORECASE)
+
+
+def sifresiz(metin):
+    """Mesajda verilen şifre yönlendirme, başlık ve sohbet modellerine gitmesin (görev kendi yer tutucusunu kullanır)."""
+    return koruma.gizle(metin, koruma.gizli_adaylar(metin))
 
 
 def oneriler(model, soru, cevap):
@@ -60,20 +65,23 @@ def baslik_uret(model, soru):
 def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), oneri=True):
     basla = time.time()
     cevap = ""
+    temiz_soru = sifresiz(soru)
+    temiz_gecmis = [{**m, "content": sifresiz(m["content"])} for m in gecmis]
     try:
         if mod == "gorev":
             # Görev modunda her mesaj tarayıcı açmasın: sohbet ve kısa bilgi soruları doğrudan cevaplanır
-            hedef = yon_belirle(model, soru, gecmis)
+            hedef = yon_belirle(model, temiz_soru, temiz_gecmis)
             yield {"tur": "yon", "hedef": hedef}
             oneri = False
             if hedef == "gorev":
-                uretec = gorev.calistir(soru, model, gecmis)
+                uretec = gorev.calistir(soru, model, gecmis)  # görev şifreyi yer tutucuyla kendisi korur
             elif hedef == "sohbet":
-                uretec = sohbet(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
+                uretec = sohbet(temiz_soru, temiz_gecmis, model, onceki_kaynaklar, diger_sohbetler)
             else:
-                uretec = hizli(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
+                uretec = hizli(temiz_soru, temiz_gecmis, model, onceki_kaynaklar, diger_sohbetler)
         else:
-            uretec = (derin if mod == "derin" else hizli)(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
+            uretec = (derin if mod == "derin" else hizli)(temiz_soru, temiz_gecmis, model, onceki_kaynaklar,
+                                                          diger_sohbetler)
         for olay in uretec:
             if olay["tur"] == "cevap_bitti":
                 cevap = olay["metin"]
@@ -81,7 +89,7 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
             yield olay
         yield {"tur": "bitti", "sure": round(time.time() - basla, 1)}
         if oneri:
-            yield from oneriler(model, soru, cevap)
+            yield from oneriler(model, temiz_soru, cevap)
     except ModelHatasi as e:
         yield {"tur": "hata", "metin": str(e), "bulut": True}
     except Exception as e:

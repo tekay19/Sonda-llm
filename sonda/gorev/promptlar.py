@@ -47,9 +47,10 @@ KURALLAR:
   butonlarına ASLA basma. Bunlar kullanıcının işi: o noktaya gelince sana_birak de ya da görevi bitir.
 - Oturum: kullanıcının tarayıcısındaki mevcut oturumu kullan. Hesapla ilgili görevlerde önce doğrudan hesap/profil
   sayfasına git; zaten giriş yapılmışsa tekrar giriş yapmaya çalışma.
-- Şifre: kullanıcı görevde bir sitenin e-postasını/şifresini verdiyse ve giriş gerekiyorsa o sitede girip giriş
-  yapabilirsin; o şifreyi başka hiçbir sitede kullanma. Görevde şifre yoksa giriş yapmaya çalışma: giriş sayfası
-  çıkarsa sana_birak ile girişi kullanıcıya bırak.
+- Şifre: kullanıcı görevde bir sitenin şifresini verdiyse şifre sana {{SIFRE_1}} gibi bir yer tutucuyla gösterilir.
+  Giriş gerekiyorsa o sitede şifre alanına tam olarak bu yer tutucuyu yaz (gerçek şifreyi Sonda doldurur); yer
+  tutucuyu başka hiçbir alana ya da adrese yazma, o şifreyi başka hiçbir sitede kullanma. Görevde şifre yoksa giriş
+  yapmaya çalışma: giriş sayfası çıkarsa sana_birak ile girişi kullanıcıya bırak.
 - Devretmeden önce yapabileceğin her şeyi yap: sayfaya git, izinli alanları doldur; sadece gerçekten senin
   yapamayacağın adımı kullanıcıya bırak.
 - Profilde veya ayarlarda düzenleme istenirse düzenleyip "Kaydet/Save" butonuna kendin basabilirsin.

@@ -193,6 +193,23 @@ def gizle(metin, gizliler):
     return metin
 
 
+YER_TUTUCU = re.compile(r"\{SIFRE_\d+\}")
+
+
+def yer_tutucular(metin):
+    """Görevdeki şifreler için {SIFRE_1}, {SIFRE_2}...: model yalnızca bunları görür, gerçek değeri kod yazar."""
+    metin = str(metin or "")
+    adaylar = sorted(gizli_adaylar(metin), key=lambda a: (metin.find(a), -len(a)))
+    return {f"{{SIFRE_{i}}}": a for i, a in enumerate(adaylar, 1)}
+
+
+def yer_tut(metin, harita):
+    metin = str(metin or "")
+    for tutucu, gizli in sorted(harita.items(), key=lambda x: -len(x[1])):  # uzun şifre önce: iç içe geçmesin
+        metin = re.sub(re.escape(gizli), tutucu, metin, flags=re.I)
+    return metin
+
+
 def _enter_guvenli(form_ogeleri):
     """Enter formun varsayılan butonunu tetikler: hassas alan yoksa ve form küçük bir arama formuysa güvenli."""
     if any(hassas_alan(f) for f in form_ogeleri):
