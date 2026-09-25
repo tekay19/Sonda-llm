@@ -366,3 +366,31 @@ def test_sistem_promptu_akil_yurutme_ve_kesif_ister():
     s = gorev.SISTEM
     for ifade in ("değerlendir", "kaydır", "daha fazla", "İngilizce", "farklı site"):
         assert ifade.lower() in s.lower(), ifade
+
+
+def test_eksik_incelenen_sayfada_not_uyari_verir(sahte, yerel_tarayici_ac, site):
+    """Sayfanın tamamı görülmeden ve 'daha fazla' butonu açılmadan alınan not için model uyarılmalı."""
+    m = sahte([{"eylem": "git", "url": f"{site}/en/shop.html"},
+               {"eylem": "not_al", "metin": "En ucuz Kioxia $61.49"},
+               {"eylem": "bitir", "sonuc": "x"}])
+    calistir(yerel_tarayici_ac)
+    sonuc = m.istemler[2].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+    assert "Dikkat" in sonuc and "Show more" in sonuc and "%" in sonuc
+
+
+def test_eksik_incelenen_sayfayla_bitirme_reddedilir(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/en/shop.html"},
+               {"eylem": "not_al", "metin": "En ucuz Kioxia $61.49"},
+               {"eylem": "bitir", "sonuc": "x"},
+               {"eylem": "bitir", "sonuc": "x"}])
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 5  # en fazla iki kez reddedilir, üçüncüde kabul edilir
+    assert "Henüz bitirme" in m.istemler[3] and "shop.html" in m.istemler[3]
+
+
+def test_tam_incelenen_sayfada_uyari_yok(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"},
+               {"eylem": "not_al", "metin": "Giriş sayfası"},
+               {"eylem": "bitir", "sonuc": "x"}])
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 3 and "Henüz bitirme" not in m.istemler[2]

@@ -40,6 +40,13 @@ EYLEMLER = {"git": ["url"], "tikla": ["no"], "yaz": ["no", "metin"], "sec": ["no
 # "Daha fazlasını gör" türü butonlar modele ayrıca işaretlenir: sayfanın gizli içeriğini açarlar
 _DAHA_FAZLA = re.compile(r"daha fazla|devamini|tumunu (gor|goster)|hepsini gor|diger yorum|sonraki|show more"
                          r"|load more|see (more|all)|read more|view (more|all)|more results|\bnext\b|expand")
+_SAYFALAMA = re.compile(r"sonraki|\bnext\b")  # sayfalama butonu her zaman durur; "açılmamış içerik" sayılmaz
+TAM_GORULDU = 90
+
+
+def _daha_fazla_mi(o):
+    ad = o["metin"] or o["aria"] or o["yer"] or o["baslik"] or o["ad"]
+    return bool(_DAHA_FAZLA.search(koruma.sade(f"{ad} {o['aria']}")))
 
 SISTEM = """Sen Sonda'sın: kullanıcının Chrome tarayıcısında, onun adına görev yapan titiz ve dikkatli bir araştırmacı.
 Bugün: {tarih}.
@@ -183,7 +190,7 @@ def _oge_satiri(o):
         satir += " (işaretli)"
     if hassas:
         satir += " 🔒kullanıcının"
-    elif tur in ("buton", "bağlantı") and _DAHA_FAZLA.search(koruma.sade(f"{ad} {o['aria']}")):
+    elif tur in ("buton", "bağlantı") and _daha_fazla_mi(o):
         satir += " ⤵ daha fazla içerik açar"
     return satir
 
@@ -209,11 +216,11 @@ class SayfaHafizasi:
     """Görev boyunca ziyaret edilen sayfalar: nerede ne yapıldı, ne kadarı görüldü, ne bulundu."""
 
     def __init__(self):
-        self.sayfalar = {}  # adres -> {"baslik", "gorulen", "eylemler", "notlar"}; son kullanılan sonda
+        self.sayfalar = {}  # adres -> {"baslik", "gorulen", "acilmamis", "eylemler", "notlar"}; son kullanılan sonda
 
     def _kayit(self, url, baslik=""):
         url = url.split("#")[0]
-        k = self.sayfalar.pop(url, None) or {"baslik": "", "gorulen": 0, "eylemler": [], "notlar": []}
+        k = self.sayfalar.pop(url, None) or {"baslik": "", "gorulen": 0, "acilmamis": [], "eylemler": [], "notlar": []}
         k["baslik"] = baslik or k["baslik"]
         self.sayfalar[url] = k
         return k
@@ -222,6 +229,23 @@ class SayfaHafizasi:
         k = self._kayit(sayfa["url"], sayfa["baslik"])
         if sayfa.get("kaydirma"):
             k["gorulen"] = max(k["gorulen"], _gorulen_yuzde(sayfa["kaydirma"]))
+        k["acilmamis"] = [koruma.oge_adi(o) for o in sayfa["ogeler"] if o["etiket"] in ("a", "button")
+                          and _daha_fazla_mi(o) and not _SAYFALAMA.search(koruma.sade(koruma.oge_adi(o)))][:3]
+
+    def eksik(self, url):
+        """Sayfa tam incelenmediyse nedenini döner, incelendiyse boş metin."""
+        k = self.sayfalar.get(url.split("#")[0])
+        if not k:
+            return ""
+        parca = []
+        if k["gorulen"] < TAM_GORULDU:
+            parca.append(f"sayfanın sadece %{k['gorulen']}'ini gördün")
+        if k["acilmamis"]:
+            parca.append("açılmamış " + ", ".join(f"“{a}”" for a in k["acilmamis"]) + " butonu var")
+        return " ve ".join(parca)
+
+    def eksik_notlu(self):
+        return [(url, self.eksik(url)) for url, k in self.sayfalar.items() if k["notlar"] and self.eksik(url)]
 
     def eylem(self, url, metin):
         self._kayit(url)["eylemler"].append(metin)
@@ -409,6 +433,15 @@ def _dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                                  + ". Başka kaynaklara da bak (gerekirse İngilizce arama yap), bulduklarını not al.")
                 adimlar.append(f"{adim_no}. bitirmek istedi, kaynak yetersiz olduğu için devam{dusunce_ek}")
                 continue
+            eksikler = hafiza_.eksik_notlu()
+            if eksikler and bitir_red < BITIR_RED_SINIRI and adim_no < maks - 3:
+                bitir_red += 1
+                geri_bildirim = ("Henüz bitirme: not aldığın bazı sayfaları tam incelemedin: "
+                                 + "; ".join(f"{u} ({n})" for u, n in eksikler[:3])
+                                 + ". Bu sayfalara dönüp kaydır ve 'daha fazla' butonlarını aç; daha iyi seçenek "
+                                   "olabilir. Notlarını gerekirse düzelt.")
+                adimlar.append(f"{adim_no}. bitirmek istedi, sayfalar tam incelenmediği için devam{dusunce_ek}")
+                continue
             durum["sonuc"], durum["hal"] = str(karar.get("sonuc", "")), "Görev tamamlandı."
             return
 
@@ -472,6 +505,9 @@ def _dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         adimlar.append(f"{adim_no}. {olay['metin'][:120]}{dusunce_ek}")
         if e == "not_al":
             hafiza_.not_(onceki_url, str(karar["metin"])[:200])
+            if eksik := hafiza_.eksik(onceki_url):
+                geri_bildirim += (f" Dikkat: {eksik}; not aldığın bilgi eksik olabilir (ör. daha ucuz ya da daha "
+                                  "iyi seçenek aşağıda olabilir). Kaydırıp/açıp kontrol et, gerekirse notu düzelt.")
         elif e == "kaydir":
             hafiza_.eylem(onceki_url, "kaydırıldı")
         elif e != "git":
