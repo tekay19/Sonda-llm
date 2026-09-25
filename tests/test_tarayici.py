@@ -258,3 +258,34 @@ def test_captcha_adresi_alan_adina_gore_tanınır():
     assert not captcha_adresi_mi("https://evil.example/x?hcaptcha.com")
     assert not captcha_adresi_mi("https://evil.example/turnstile")
     assert not captcha_adresi_mi("https://www.google.com/search?q=recaptcha")
+
+
+
+# ---- Final inceleme I3: sayfa ana dünyada DOM'u değiştirip korumayı kandıramaz
+def test_yalanci_sayfa_korumayi_kandiramaz(tarayici, site):
+    from sonda import koruma
+    tarayici.git(f"{site}/yalanci.html")
+    s = tarayici.bak()
+    al = next(o for o in s["ogeler"] if o["kimlik"] == "al")
+    kart = next(o for o in s["ogeler"] if o["kimlik"] == "kart")
+    bilgi_al = tarayici.oge_bilgisi(al["no"])
+    bilgi_kart = tarayici.oge_bilgisi(kart["no"])
+    assert "Satın al" in bilgi_al["oge"]["metin"]
+    assert not koruma.kontrol({"eylem": "tikla", "no": al["no"]}, bilgi_al["oge"], bilgi_al["form_ogeleri"]).izin
+    assert bilgi_kart["oge"]["otomatik"] == "cc-number"
+    assert not koruma.kontrol({"eylem": "yaz", "no": kart["no"], "metin": "4111"}, bilgi_kart["oge"]).izin
+
+
+def test_golge_domdaki_ayni_numarali_tuzak(tarayici, site):
+    from conftest import ihlaller
+    tarayici.git(f"{site}/yalanci.html")
+    no = next(o for o in tarayici.bak()["ogeler"] if o["kimlik"] == "yorum")["no"]
+    tarayici.sayfa.evaluate("""n => {
+        const kap = document.createElement('div'); document.body.prepend(kap);
+        const kok = kap.attachShadow({ mode: 'open' });
+        kok.innerHTML = `<button data-yasak data-sonda-id="${n}" onclick="ihlalEkle('tiklama', 'golge')">Öde</button>`;
+    }""", no)
+    assert tarayici.oge_bilgisi(no) is None  # aynı numara iki öğede: güvenilmez
+    with pytest.raises(Exception):
+        tarayici.tikla(no)
+    assert ihlaller(tarayici) == []

@@ -75,10 +75,3 @@ ENGEL = """(e) => {
 CAPTCHA_BASLIKLARI = ("just a moment", "bir dakika", "checking your browser", "attention required")
 CAPTCHA_KUTULARI = ("#recaptcha-anchor", "#checkbox", "input[type=checkbox]", "[role=checkbox]")
 
-BILGI = "(no) => { const acikla = " + ACIKLA + r""";
-  const e = document.querySelector(`[data-sonda-id="${no}"]`);
-  if (!e) return null;
-  const form = e.form || e.closest('form');
-  const kardes = form ? [...form.querySelectorAll('input:not([type=hidden]), select, textarea')].map(acikla) : [];
-  return { oge: acikla(e), form_ogeleri: kardes };
-}"""

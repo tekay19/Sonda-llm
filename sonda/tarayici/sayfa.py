@@ -3,7 +3,7 @@ from urllib.parse import urlparse
 
 import trafilatura
 
-from .js import BAK, BILGI, CAPTCHA_BASLIKLARI, CAPTCHA_KUTULARI, ENGEL
+from .js import BAK, CAPTCHA_BASLIKLARI, CAPTCHA_KUTULARI, ENGEL
 
 # Bilinen robot doğrulaması sunucuları -> çerçeve adresinin yol öneki. Adresin herhangi bir yerinde geçen kelimeye
 # değil, gerçek ana makineye bakılır (final inceleme: "evil.example/?hcaptcha.com" captcha sayılıyordu).
@@ -86,7 +86,8 @@ class Tarayici:
             pass  # açılır pencere bu arada kapandıysa sonraki erişimde önceki sekmeye dönülür
 
     def _loc(self, no):
-        return self.sayfa.locator(f'[data-sonda-id="{int(no)}"]').first
+        # .first yok: aynı numarayı taşıyan ikinci bir öğe (gölge DOM tuzağı) varsa Playwright işlemi reddeder
+        return self.sayfa.locator(f'[data-sonda-id="{int(no)}"]')
 
     def bak(self):
         sayfa = self.sayfa.evaluate(BAK)
@@ -134,7 +135,60 @@ class Tarayici:
         return False
 
     def oge_bilgisi(self, no):
-        return self.sayfa.evaluate(BILGI, int(no))
+        """Koruma kararı için öğe bilgisi. Playwright'ın izole dünyasından okunur: sayfa ana dünyada DOM'u
+        (getAttribute, innerText...) değiştirse de koruma gerçeği görür. Numara birden fazla öğedeyse None."""
+        loc = self._loc(no)
+        try:
+            if loc.count() != 1:
+                return None
+            oge, form = self._acikla(loc, int(no))
+            kardesler = []
+            if form is not None:
+                alanlar = form.locator("input:not([type=hidden]), select, textarea")
+                for i in range(min(alanlar.count(), 20)):
+                    kardesler.append(self._acikla(alanlar.nth(i), 0)[0])
+            return {"oge": oge, "form_ogeleri": kardesler}
+        except SekmeKapandi:
+            raise
+        except Exception:
+            return None
+
+    def _acikla(self, loc, no):
+        z = 3000
+
+        def ozellik(ad):
+            return loc.get_attribute(ad, timeout=z) or ""
+        etiket = next((t for t in ("a", "button", "input", "select", "textarea", "summary")
+                       if loc.locator(f"xpath=self::{t}").count()), "div")
+        tip = ozellik("type").lower() if etiket in ("input", "button") else ""
+        d = {"no": no, "etiket": etiket, "rol": ozellik("role"), "tip": tip, "ad": ozellik("name"),
+             "kimlik": ozellik("id"), "otomatik": ozellik("autocomplete").lower(), "yer": ozellik("placeholder"),
+             "aria": ozellik("aria-label"), "baslik": ozellik("title"), "href": ozellik("href") if etiket == "a" else "",
+             "deger": "", "ekranda": True}
+        metin = ""
+        if etiket in ("input", "select", "textarea"):
+            if d["kimlik"]:
+                etiketler = self.sayfa.locator(f'label[for="{d["kimlik"].replace(chr(34), "")}"]')
+                if etiketler.count():
+                    metin = etiketler.first.inner_text(timeout=z)
+            if not metin:
+                ata = loc.locator("xpath=ancestor::label[1]")
+                if ata.count():
+                    metin = ata.inner_text(timeout=z)
+            try:
+                d["deger"] = loc.input_value(timeout=z)[:80]
+            except Exception:
+                pass
+            if tip in ("checkbox", "radio"):
+                d["secili"] = loc.is_checked(timeout=z)
+        else:
+            metin = loc.inner_text(timeout=z)
+        d["metin"] = " ".join(metin.split())[:120]
+        form = loc.locator("xpath=ancestor::form[1]")
+        var = form.count() > 0
+        d["form"] = 0 if var else -1
+        d["form_eylem"] = (form.get_attribute("action", timeout=z) or "") if var else ""
+        return d, (form if var else None)
 
     def git(self, url):
         self.sayfa.goto(url, wait_until="domcontentloaded", timeout=ZAMAN_ASIMI)
