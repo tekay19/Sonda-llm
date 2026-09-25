@@ -8,6 +8,7 @@ Tek istisna (kullanıcı kararı): kullanıcı görev mesajında bir sitenin şi
 o şifre, yalnızca görevde adı geçen sitede şifre alanına yazılabilir ve giriş butonuna basılabilir. Kart, CVV, IBAN
 ve doğrulama kodları görevde verilse bile kullanıcıya kalır.
 """
+import base64
 import re
 from dataclasses import dataclass
 from urllib.parse import unquote, urlparse
@@ -138,13 +139,29 @@ def _sifre_alani(oge):
 _KELIME = re.compile(r"[^\W\d_]+([-'][^\W\d_]+)*")
 
 
+# Şifre sözcüğünden hemen sonra gelse de şifre olmayan kelimeler ("şifremle giriş yap", "password is ...")
+_DURAK = {"ile", "ve", "olarak", "is", "for", "to", "gir", "giris", "yap", "kullan", "bu", "su", "benim", "my", "the",
+          "hesabima", "hesap", "unuttum", "sifirla", "degistir", "yok", "alani", "alanina", "girme", "girmeden"}
+
+
+def _kesin_aday(a):
+    return len(a) >= 4 and "@" not in a and "://" not in a and not _alan_adi_mi(a) and sade(a) not in _DURAK \
+        and not _SIFRE.search(sade(a))
+
+
 def gizli_adaylar(gorev_metni):
-    """Görev metninde şifre sözcüğünün yakınında (3 kelime) geçen, şifreye benzeyen değerler."""
+    """Görevde verilen şifreler: şifre sözcüğünden hemen sonraki kelime (şekli ne olursa olsun: "sunflower",
+    "correct-horse-battery") ve yakınındaki (3 kelime) şifreye benzeyen değerler ("'abc123' şifresiyle")."""
     temiz = [k.strip("'\"“”‘’.,;:()") for k in str(gorev_metni or "").split()]
     adaylar = set()
     for i, k in enumerate(temiz):
         if not _SIFRE.search(sade(k)):
             continue
+        j = i + 1
+        while j < len(temiz) and sade(temiz[j]) in ("is", "olarak", ""):
+            j += 1
+        if j < len(temiz) and _kesin_aday(temiz[j]):
+            adaylar.add(temiz[j])
         for a in temiz[max(0, i - 3):i] + temiz[i + 1:i + 4]:
             if len(a) >= 4 and "@" not in a and "://" not in a and not _KELIME.fullmatch(a) and not _alan_adi_mi(a):
                 adaylar.add(a)
@@ -152,8 +169,37 @@ def gizli_adaylar(gorev_metni):
 
 
 def _gizli_iceriyor(metin, gizliler):
-    metin = unquote(unquote(str(metin or "")))
-    return any(g in metin for g in gizliler if len(g) >= 4)
+    """Şifrenin tamamı, yarısından uzun bir parçası (büyük/küçük harf fark etmez), base64 ya da hex hali geçiyor mu?"""
+    metin = unquote(unquote(str(metin or ""))).lower()
+    for g in gizliler:
+        if len(g) < 4:
+            continue
+        n = max(4, len(g) // 2)
+        kucuk = g.lower()
+        if any(kucuk[i:i + n] in metin for i in range(len(kucuk) - n + 1)):
+            return True
+        kodlar = (base64.b64encode(g.encode()).decode().rstrip("=").lower(), g.encode().hex())
+        if any(kod[:max(8, len(kod) // 2)] in metin for kod in kodlar):
+            return True
+    return False
+
+
+def gizle(metin, gizliler):
+    """Çıktılarda şifreleri ••• ile değiştirir."""
+    metin = str(metin or "")
+    for g in gizliler:
+        if len(g) >= 4:
+            metin = re.sub(re.escape(g), "•••", metin, flags=re.I)
+    return metin
+
+
+def _enter_guvenli(form_ogeleri):
+    """Enter formun varsayılan butonunu tetikler: hassas alan yoksa ve form küçük bir arama formuysa güvenli."""
+    if any(hassas_alan(f) for f in form_ogeleri):
+        return False
+    yazilabilir = [f for f in form_ogeleri if f.get("etiket") == "textarea" or
+                   (f.get("etiket") == "input" and f.get("tip") in ("", "text", "search", "email", "tel", "number", "url"))]
+    return len(yazilabilir) <= 2
 
 
 def _submit_mu(oge):
@@ -181,7 +227,8 @@ def kontrol(eylem, oge=None, form_ogeleri=(), gorev_metni="", url="", gizliler=(
             return Karar(False, "🔒 Görevde verdiğin şifre yalnızca o sitenin şifre alanına yazılabilir.")
         if hassas_alan(oge):
             return Karar(False, f"🔒 “{oge_adi(oge)}” hassas bir alan. Kart, şifre ve doğrulama bilgilerini sen girmelisin.")
-        return Karar(True, enter=ad == "yaz" and bool(eylem.get("enter")) and arama_kutusu(oge))
+        return Karar(True, enter=ad == "yaz" and bool(eylem.get("enter")) and arama_kutusu(oge)
+                     and _enter_guvenli(form_ogeleri))
     if ad == "tikla":
         kimlik = _kimlik_gorevi(gorev_metni, url)
         metin = sade(" ".join(str(oge.get(k) or "") for k in ("metin", "deger", "aria", "baslik")))

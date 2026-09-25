@@ -17,6 +17,17 @@ from .promptlar import CAPTCHA_SEBEBI, DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TA
 from .sayfa import SayfaHafizasi, eksik_form_alanlari, iki_adim_mi
 
 
+class GizliListe(list):
+    """Adım geçmişi: eklenen her satırda şifreler gizlenir (model üretimi metinler de dahil)."""
+
+    def __init__(self, gizliler):
+        super().__init__()
+        self.gizliler = gizliler
+
+    def append(self, metin):
+        super().append(koruma.gizle(metin, self.gizliler))
+
+
 _ZOR_DURUM = ("Eylem başarısız", "Henüz bitirme", "Önce", "🔒", "Geçersiz", "Yalnızca")
 
 
@@ -145,7 +156,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
         if mesaj and mesaj != son_mesaj:
             yield {"tur": "anlatim", "metin": mesaj}
             son_mesaj = mesaj
-        dusunce = str(karar.get("dusunce") or "").strip()[:200]
+        dusunce = koruma.gizle(str(karar.get("dusunce") or "").strip()[:200], durum["gizli"])
         dusunce_ek = f" — düşünce: {dusunce}" if dusunce else ""
         if e in ("bitir", "sana_birak") and not form_red and (eksik_alan := eksik_form_alanlari(sayfa["ogeler"], gorev_metni)):
             form_red = True
@@ -174,7 +185,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                                    "olabilir. Notlarını gerekirse düzelt.")
                 adimlar.append(f"{adim_no}. bitirmek istedi, sayfalar tam incelenmediği için devam{dusunce_ek}")
                 continue
-            durum["sonuc"], durum["hal"] = str(karar.get("sonuc", "")), "Görev tamamlandı."
+            durum["sonuc"], durum["hal"] = koruma.gizle(karar.get("sonuc", ""), durum["gizli"]), "Görev tamamlandı."
             durum["kod"] = "tamamlandi"
             return
 
@@ -314,6 +325,9 @@ def sonuc_yaz(model, gorev_metni, durum):
 
 
 def yurut(g, gorev_metni, onceki, model, tarayici_ac):
+    # Önceki mesajlarda verilmiş şifreler de korunur ve istemlere/kayıtlara açık yazılmaz
+    onceki_gizli = koruma.gizli_adaylar(onceki)
+    onceki = koruma.gizle(onceki, onceki_gizli)
     yield adim("baglan", "Chrome'a bağlanılıyor")
     try:
         t = tarayici_ac()
@@ -325,8 +339,10 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
     yield {"tur": "adim", "tip": "plan", "detay": derinlik["plan"],
            "metin": f"{derinlik['derinlik'].capitalize()} görev: en az {derinlik['min_site']} site, "
                     f"en fazla {derinlik['maks_adim']} adım"}
-    durum = {"notlar": [], "adimlar": [], "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": set(),
+    gizliler = set()
+    durum = {"notlar": [], "adimlar": GizliListe(gizliler), "hafiza": SayfaHafizasi(), "sonuc": "", "hal": "", "gizli": gizliler,
              "derinlik": derinlik}
+    durum["gizli"].update(onceki_gizli)
     try:
         yield from dongu(g, gorev_metni, onceki, model, t, durum, derinlik)
     except tarayici.SekmeKapandi:

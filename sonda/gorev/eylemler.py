@@ -26,7 +26,8 @@ def uygula(t, karar, gorev_metni, notlar, oge):
         return adim("gir", f"“{ad}” alanına “{yazilan}” yazıldı{ek}"), f"Yazıldı{ek}.{not_}"
     if e == "sec":
         t.sec(karar["no"], karar["deger"])
-        return adim("gir", f"“{ad}” için “{karar['deger']}” seçildi"), "Seçildi."
+        secilen = "•••" if karar.get("gizli") else karar["deger"]
+        return adim("gir", f"“{ad}” için “{secilen}” seçildi"), "Seçildi."
     if e == "kaydir":
         t.kaydir(karar.get("yon", "asagi"))
         return adim("gezin", "Sayfa kaydırıldı"), "Kaydırıldı; ekranda görünen metin güncellendi."
