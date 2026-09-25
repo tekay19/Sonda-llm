@@ -801,7 +801,8 @@ def test_basarisiz_adimdan_sonra_dusunerek_karar_verir(sahte, yerel_tarayici_ac)
     assert m.dusunceler[0] is False and m.dusunceler[1] is True
 
 
-def test_derin_gorevde_duzenli_dusunur(sahte, yerel_tarayici_ac, site, monkeypatch):
+def test_derin_gorevde_duzenli_dusunme_istenirse_calisir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    monkeypatch.setattr(gorev.ayar, "DUSUNME_ARALIGI", 5)
     m = sahte([{"eylem": "git", "url": f"{site}/uzun.html"}] + [{"eylem": "kaydir"}] * 11)
     monkeypatch.setattr(gorev.karar, "derinlik_belirle",
                         lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 11, "plan": [], "inceleme": False})
@@ -933,3 +934,21 @@ def test_eski_gorev_kayitlari_silinir(tmp_path, monkeypatch):
     for i in range(5):
         GorevKaydi(f"g{i}", set()).yaz({"adim": 1})
     assert len(list(tmp_path.glob("*.jsonl"))) == 3
+
+
+
+# ---- Gerçek Upwork testi: düşünme adımları 7 dakikaya çıktı, aynı sayfa arka arkaya iki kez okundu
+def test_varsayilan_duzenli_dusunme_kapali(sahte, yerel_tarayici_ac, site, monkeypatch):
+    m = sahte([{"eylem": "git", "url": f"{site}/uzun.html"}] + [{"eylem": "kaydir"}] * 7)
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 7, "plan": [], "inceleme": False})
+    calistir(yerel_tarayici_ac)
+    assert not any(m.dusunceler)
+
+
+def test_ayni_sayfa_arka_arkaya_iki_kez_okunmaz(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/uzun.html"}, {"eylem": "oku"}, {"eylem": "oku"},
+               {"eylem": "kaydir"}, {"eylem": "oku"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac)
+    assert [x["tip"] for x in o if x["tur"] == "adim"].count("incele") == 2  # arada kaydırınca yeniden okunabilir
+    assert "zaten okudun" in m.istemler[3].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]

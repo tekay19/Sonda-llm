@@ -24,7 +24,7 @@ def dusunmeli(derinlik, adim_no, geri_bildirim):
     """Düşünme modu pahalıdır: bir şey ters gittiğinde ve derin görevlerde düzenli aralıklarla açılır."""
     if geri_bildirim.startswith(_ZOR_DURUM) or "öğe yok" in geri_bildirim or "Dikkat:" in geri_bildirim:
         return True
-    return derinlik["derinlik"] == "derin" and adim_no % ayar.DUSUNME_ARALIGI == 1
+    return bool(ayar.DUSUNME_ARALIGI) and derinlik["derinlik"] == "derin" and adim_no % ayar.DUSUNME_ARALIGI == 1
 
 
 def devret(g, sebep, otomatik=None):
@@ -60,7 +60,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
     yapilan, erken_red, form_red, son_mesaj = 0, False, False, ""
-    captcha_denenen = set()
+    captcha_denenen, son_okuma = set(), None
     durum["gizli"].update(koruma.gizli_adaylar(gorev_metni))
     kayit = GorevKaydi(g.id, durum["gizli"])
     def ilerleme():  # not sayısı ve açılan gerçek sayfa sayısı
@@ -242,6 +242,14 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                     geri_bildirim = "Robot doğrulaması tamamlandı; kaldığın yerden devam et."
             yapilan += 1
             continue
+        if e == "oku":
+            okuma = (t.url, (sayfa.get("kaydirma") or {}).get("y"))
+            if okuma == son_okuma:  # arada sayfa değişmedi: aynı içeriği yeniden okumak dakikalar kaybettirir
+                geri_bildirim = ("Bu sayfayı aynı konumda zaten okudun; içeriği hafızanda. Başka bir adım seç: "
+                                 "kaydır, 'more' aç, not al ya da ilerle.")
+                adimlar.append(f"{adim_no}. oku -> aynı sayfa zaten okunmuştu")
+                continue
+            son_okuma = okuma
         onceki_url = t.url
         if e == "not_al":  # şifre notlara ve oradan cevaba sızmasın
             for gizli in koruma.gizli_adaylar(gorev_metni) | durum["gizli"]:

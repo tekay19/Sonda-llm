@@ -38,7 +38,7 @@ IKI_ADIM_KONTROL = 2  # saniye: kullanıcı doğrulamayı bitirdi mi diye sayfay
 
 SAYFA_METNI = 8000  # sayfa başına biriktirilen görülen metin (karakter)
 SONUC_ICERIK = 15000  # son cevaba giden görülen içerik (karakter)
-DUSUNME_ARALIGI = 5  # derin görevde her 5 adımda bir düşünerek karar
+DUSUNME_ARALIGI = 0  # derin görevde her N adımda düşünme; 0 = kapalı (gerçek testte adım başına dakikalar sürdü)
 DEGERLENDIRME_ARALIGI = 10  # orta/derin görevde her 10 adımda ara değerlendirme ve plan güncelleme
 KAYIT_KLASORU = Path(__file__).resolve().parents[2] / "veri" / "gorev_kayitlari"
 KAYIT_SAYISI = 30  # en fazla bu kadar görev kaydı saklanır
