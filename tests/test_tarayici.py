@@ -289,3 +289,16 @@ def test_golge_domdaki_ayni_numarali_tuzak(tarayici, site):
     with pytest.raises(Exception):
         tarayici.tikla(no)
     assert ihlaller(tarayici) == []
+
+
+# ---- Final inceleme I2: kilitlenen sayfa görev işçisini sonsuza dek bekletmez
+def test_kilitli_sayfada_bak_zaman_asimina_ugrar(tarayici, site, monkeypatch):
+    import time
+    from sonda.tarayici import sayfa as sm
+    monkeypatch.setattr(sm, "ZAMAN_ASIMI", 3000)
+    tarayici.git(f"{site}/mesgul.html")
+    time.sleep(0.8)  # sayfanın JS'i kilitlendi
+    bas = time.monotonic()
+    with pytest.raises(Exception):
+        tarayici.bak()
+    assert time.monotonic() - bas < 8

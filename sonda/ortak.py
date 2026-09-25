@@ -12,6 +12,12 @@ GUNLER = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", 
 
 
 # Tüm çağrılarda aynı bağlam boyutu: değişirse Ollama modeli baştan yükler
+# Ollama çağrılarına zaman sınırı: takılan bir çağrı görev işçisini (ve sonraki tüm görevleri) kilitlemesin.
+# Düşünme modundaki uzun analizler işlemcide dakikalar sürebildiği için sınır cömert.
+OLLAMA_ZAMAN_ASIMI = 900
+_istemci = ollama.Client(timeout=OLLAMA_ZAMAN_ASIMI)
+ollama.chat, ollama.embed, ollama.list, ollama.ps = _istemci.chat, _istemci.embed, _istemci.list, _istemci.ps
+
 SECENEKLER = {"num_ctx": 32768, "temperature": 0.3}
 
 

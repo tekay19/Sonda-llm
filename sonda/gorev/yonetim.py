@@ -77,6 +77,7 @@ def komut_ver(gorev_id, komut):
 
 
 def calistir(gorev_metni, model, gecmis=(), tarayici_ac=None):
+    onceki_suruyor = bool(GOREVLER)
     g = Gorev()
     GOREVLER[g.id] = g
     onceki = "\n".join(f"{m['role']}: {m['content'][:500]}" for m in list(gecmis)[-4:])
@@ -94,6 +95,8 @@ def calistir(gorev_metni, model, gecmis=(), tarayici_ac=None):
     _ISCI.submit(isci)
     try:
         yield {"tur": "gorev_basladi", "id": g.id}
+        if onceki_suruyor:  # tek tarayıcı işçisi: yeni görev sıraya girer, kullanıcı bunu bilsin
+            yield {"tur": "anlatim", "metin": "Önceki görev hâlâ sürüyor; o bitince bu göreve başlayacağım."}
         while True:
             try:
                 olay = kuyruk.get(timeout=ayar.NABIZ_ARALIGI)

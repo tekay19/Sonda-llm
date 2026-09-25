@@ -90,7 +90,10 @@ class Tarayici:
         return self.sayfa.locator(f'[data-sonda-id="{int(no)}"]')
 
     def bak(self):
-        sayfa = self.sayfa.evaluate(BAK)
+        # evaluate zaman aşımı almaz: JS'i kilitlenen bir sayfa tek görev işçisini sonsuza dek bekletirdi.
+        # wait_for_function zaman aşımı alır; aralıklı yoklama arka plan sekmesinde de çalışır (rAF durur).
+        tutamac = self.sayfa.wait_for_function("() => (" + BAK + ")()", polling=100, timeout=ZAMAN_ASIMI)
+        sayfa = tutamac.json_value()
         sayfa["captcha"] = bool(self._captcha_cerceveleri()) or \
             any(b in sayfa["baslik"].lower() for b in CAPTCHA_BASLIKLARI)
         return sayfa

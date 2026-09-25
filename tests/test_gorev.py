@@ -1049,3 +1049,24 @@ def test_ayni_alana_farkli_metinle_tekrar_yazmak_takilma_sayilir(sahte, yerel_ta
     sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}] + [{"eylem": "yaz", "no": 1, "metin": f"Semih {i}"} for i in range(8)])
     o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
     assert "kullaniciya" in turler(o)
+
+
+def test_ollama_cagrilarinin_zaman_siniri_var():
+    import ollama
+
+    from sonda import ortak
+    assert ollama.chat.__self__._client.timeout.read == ortak.OLLAMA_ZAMAN_ASIMI
+
+
+def test_onceki_gorev_surerken_kullaniciya_soylenir(monkeypatch):
+    from sonda import tarayici
+    from sonda.gorev.yonetim import Gorev
+    bekleyen = Gorev()
+    gorev.GOREVLER[bekleyen.id] = bekleyen
+    try:
+        def hata():
+            raise tarayici.BaglantiHatasi("yok")
+        o = list(gorev.calistir("g", "sahte", tarayici_ac=hata))
+    finally:
+        gorev.GOREVLER.pop(bekleyen.id, None)
+    assert any(x["tur"] == "anlatim" and "Önceki görev" in x["metin"] for x in o)
