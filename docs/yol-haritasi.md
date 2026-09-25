@@ -11,8 +11,15 @@ seçicide iki ucuz model çıkıyor: Gemini Flash-Lite (en ucuz) ve Gemini Flash
 - Görevde verilen şifre hiçbir modele gitmiyor, model `{SIFRE_1}` görüyor.
 - Gerçek API testleri: `.venv\Scripts\python -m pytest -m gemini`.
 
-**Açık iş:** Upwork inceleme görevini Gemini ile çalıştırıp yerel modeldeki 22 dakikalık çalışmayla karşılaştırmak
-(kullanıcının Chrome'u ve hesabıyla, kullanıcı hazır olduğunda).
+**Upwork karşılaştırması (gerçek hesap, Gemini Flash):** "Profilimi incele, neden iş alamadığımı analiz et, hiçbir
+şeyi değiştirme" görevi **64 sn, 9 adımda** bitti. Yerel modelde aynı iş 22 dakika sürmüştü (~20 kat hızlı). Robot
+doğrulaması 12 sn içinde geçildi, hiçbir şey değiştirilmedi. Cevap kanıtlı ve somut: kimlik doğrulanmamış, portfolyo
+boş, İngilizce "Conversational", "Open for work" kapalı; öncelik sıralı öneriler ve örnek başlıklar verdi.
+Zayıf yan: bazı genel Upwork bilgileri ("algoritma geri plana iter") profil kaynağına [1] atfedilmiş; bunlar
+sayfada yazmıyor.
+
+**Not:** İlk denemede deneme betiği devretmede görevi otomatik durdurduğu için captcha'da kaldı; ikinci denemede betik
+bekledi ve doğrulama geçildi.
 
 ## 1. Bugün yapılanlar
 
