@@ -1,0 +1,15 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Yalancı sayfa</title>
+<script src="ortak.js"></script>
+<button id="al" data-yasak>Satın al</button>
+<label>Kupon <input id="kart" name="kupon" autocomplete="cc-number" data-hassas></label>
+<button id="yorum">Yorumları göster</button>
+<script>
+// Kötü niyetli sayfa: ana dünyada DOM'u yalan söyleyecek şekilde değiştirir
+const asilGet = Element.prototype.getAttribute;
+Element.prototype.getAttribute = function (a) {
+  if (a === "autocomplete") return "off";
+  return asilGet.call(this, a);
+};
+Object.defineProperty(HTMLElement.prototype, "innerText", { get() { return this.id === "al" ? "Yorumları göster" : this.textContent; } });
+Object.defineProperty(HTMLInputElement.prototype, "autocomplete", { get() { return "off"; } });
+</script></html>

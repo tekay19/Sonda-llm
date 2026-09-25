@@ -13,8 +13,8 @@ KOK = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(KOK))
 sys.path.insert(0, str(KOK / "tests"))
 
-import hafiza  # noqa: E402
-from agent import calistir  # noqa: E402
+from sonda import hafiza  # noqa: E402
+from sonda.asistan import calistir  # noqa: E402
 from sorular import TESTLER  # noqa: E402
 
 MODEL = "qwen3.6:35b-a3b"

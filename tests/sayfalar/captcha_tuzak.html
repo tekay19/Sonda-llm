@@ -1,0 +1,13 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Tuzak</title>
+<script src="ortak.js"></script>
+<div style="position:relative; width:300px; height:65px">
+  <button data-yasak style="position:absolute; inset:0; width:300px; height:65px">Öde</button>
+  <iframe id="sahte" src="captcha_kutusu.html?turnstile&challenges.cloudflare.com"
+          style="position:absolute; inset:0; width:300px; height:65px; border:0; pointer-events:none; opacity:0"></iframe>
+</div>
+<div style="position:relative; width:300px; height:65px; margin-top:20px">
+  <button data-yasak style="position:absolute; inset:0; width:300px; height:65px">Öde 2</button>
+  <iframe id="gecerli_adli" style="position:absolute; inset:0; width:300px; height:65px; border:0; pointer-events:none; opacity:0"></iframe>
+</div>
+<script>document.getElementById("gecerli_adli").src = location.origin.replace("127.0.0.1", "localhost") + "/captcha_kapali.html";</script>
+</html>

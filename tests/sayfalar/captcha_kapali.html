@@ -1,0 +1,9 @@
+<!doctype html><html><meta charset="utf-8">
+<body style="margin:0"><div id="kok"></div>
+<script>
+// Cloudflare gibi: onay kutusu kapalı shadow DOM içinde, kodla erişilemez; ancak ekrandaki yerine tıklanır
+const kok = document.getElementById("kok").attachShadow({ mode: "closed" });
+kok.innerHTML = '<label style="display:flex;align-items:center;gap:8px;height:65px;padding-left:12px;font:14px sans-serif">' +
+  '<input type="checkbox" style="width:24px;height:24px;margin:0"> Verify you are human</label>';
+kok.querySelector("input").addEventListener("click", () => parent.postMessage("dogrulandi", "*"));
+</script></body></html>

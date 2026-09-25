@@ -1,0 +1,13 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Ürün - TeknoPazar</title>
+<script src="../ortak.js"></script>
+<h1 id="ad"></h1><p id="fiyat"></p>
+<button id="ekle">Sepete Ekle</button> <button data-yasak id="hemen">Hemen Al</button>
+<a href="sepet.html">Sepete Git</a> <a href="index.html" target="_blank">Ana sayfa (yeni sekme)</a>
+<p id="mesaj"></p>
+<script>
+const U = { 1: ["Samsung 990 EVO Plus 1TB NVMe SSD", 3199], 2: ["Kioxia Exceria Plus G3 1TB NVMe SSD", 2649], 3: ["WD Black SN770 1TB NVMe SSD", 2899], 4: ["Kingston A400 480GB SATA SSD", 1099], 5: ["Samsung 990 Pro 2TB NVMe SSD", 6499], 6: ["Logitech K120 Klavye", 399] };
+const id = new URLSearchParams(location.search).get("id"); const [ad, fiyat] = U[id] || ["Bulunamadı", 0];
+document.getElementById("ad").textContent = ad; document.getElementById("fiyat").textContent = fiyat.toLocaleString("tr") + " TL";
+document.title = ad + " - TeknoPazar";
+document.getElementById("ekle").onclick = () => { localStorage.setItem("sepet", JSON.stringify({ ad, fiyat })); document.getElementById("mesaj").textContent = "Sepete eklendi"; };
+</script></html>

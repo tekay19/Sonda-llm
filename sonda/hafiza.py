@@ -4,7 +4,7 @@ import threading
 import time
 from pathlib import Path
 
-DOSYA = Path(__file__).parent / "veri" / "hafiza.json"
+DOSYA = Path(__file__).resolve().parent.parent / "veri" / "hafiza.json"
 EN_FAZLA = 60
 _kilit = threading.Lock()
 
