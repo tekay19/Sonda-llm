@@ -94,3 +94,32 @@ def test_kapali_adres_hata_firlatir(tarayici):
 def test_bu_testler_ihlal_uretmez(tarayici, site):
     tarayici.git(f"{site}/magaza/odeme.html")
     assert ihlaller(tarayici) == []
+
+
+def test_baglan_baglantiyi_yeniden_kullanir(monkeypatch):
+    """Gerçek Chrome her CDP bağlantısında izin sorar: baglan() bağlantıyı önbelleğe almalı."""
+    import threading
+
+    import tarayici as tr
+    hazir, bitti = threading.Event(), threading.Event()
+
+    def sunucu():  # uzaktan hata ayıklama portu açık bir Chromium (kullanıcının Chrome'u yerine)
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as pw:
+            b = pw.chromium.launch(headless=True, args=["--remote-debugging-port=9339"])
+            hazir.set()
+            bitti.wait(60)
+            b.close()
+    threading.Thread(target=sunucu, daemon=True).start()
+    assert hazir.wait(30)
+    monkeypatch.setattr(tr, "_cdp_adresi", lambda: ["http://127.0.0.1:9339"])
+    try:
+        t1 = tr.baglan()
+        t2 = tr.baglan()
+        assert t1.sayfa.context.browser is t2.sayfa.context.browser
+        assert t1.sayfa is not t2.sayfa
+        t1.kapat()  # gerçek Chrome'da hiçbir şey kapatmaz
+        assert t2.sayfa.context.browser.is_connected()
+    finally:
+        tr.baglantiyi_kes()
+        bitti.set()

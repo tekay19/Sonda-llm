@@ -195,11 +195,38 @@ def _yedek_profili_ac():
 
 
 BAGLANTI_YARDIMI = ("Chrome'a bağlanamadım. Chrome'da adres çubuğuna chrome://inspect/#remote-debugging yazıp "
-                    "uzaktan hata ayıklama anahtarını aç, Chrome izin sorarsa onayla, sonra görevi tekrar ver.")
+                    "uzaktan hata ayıklama anahtarını aç. Chrome izin sorarsa (Sonda'nın ilk görevinde bir kez) "
+                    "\"İzin ver\"e bas, sonra görevi tekrar ver.")
+
+
+# (playwright, browser): Chrome her yeni CDP bağlantısında kullanıcıdan izin istediği için bağlantı sunucu ömrü
+# boyunca saklanır. Playwright nesneleri iş parçacığına bağlıdır: baglan() hep aynı iş parçacığından çağrılmalı
+# (gorev._ISCI).
+_baglanti = None
 
 
 def baglan():
-    """Kullanıcının Chrome'una bağlanır ve yeni bir sekme açar. Olmazsa yedek Sonda profilini açar."""
+    """Kullanıcının Chrome'una bağlanır (varsa mevcut bağlantıyı kullanır) ve yeni bir sekme açar."""
+    global _baglanti
+    if _baglanti is None or not _baglanti[1].is_connected():
+        baglantiyi_kes()
+        _baglanti = _yeni_baglanti()
+    b = _baglanti[1]
+    baglam = b.contexts[0] if b.contexts else b.new_context()
+    return Tarayici(baglam.new_page())  # kapat=None: sekme ve kullanıcının Chrome'u açık kalır
+
+
+def baglantiyi_kes():
+    global _baglanti
+    if _baglanti:
+        try:
+            _baglanti[0].stop()  # browser.close() değil: kullanıcının Chrome'u kapanmasın
+        except Exception:
+            pass
+    _baglanti = None
+
+
+def _yeni_baglanti():
     from playwright.sync_api import sync_playwright
 
     pw = sync_playwright().start()
@@ -209,10 +236,8 @@ def baglan():
         adresler = [yedek] if yedek else []
     for adres in adresler:
         try:
-            b = pw.chromium.connect_over_cdp(adres, timeout=60000)
+            return pw, pw.chromium.connect_over_cdp(adres, timeout=90000)
         except Exception:
             continue
-        baglam = b.contexts[0] if b.contexts else b.new_context()
-        return Tarayici(baglam.new_page(), kapat=pw.stop)  # browser.close() değil: kullanıcının Chrome'u açık kalır
     pw.stop()
     raise BaglantiHatasi(BAGLANTI_YARDIMI)
