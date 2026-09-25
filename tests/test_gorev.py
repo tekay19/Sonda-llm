@@ -593,3 +593,54 @@ def test_eksik_form_alanlari():
               g(etiket="select", tip="", metin="Şehir", deger="Seçiniz"), g(ad="q", tip="search")]
     eksik = eksik_form_alanlari(ogeler, "Ad Soyad Semih, e-posta x@y.com, şehir İzmir, KVKK işaretle, şifrem abc")
     assert eksik == ["E-posta", "KVKK metnini okudum", "Şehir"]
+
+
+# ---- Görev sırasında konuşma ve net bitiş
+def test_modelin_mesaji_anlatim_olarak_akar(sahte, yerel_tarayici_ac, site):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html", "mesaj": "Giriş sayfasına bakıyorum."},
+           {"eylem": "kaydir", "mesaj": "Giriş sayfasına bakıyorum."},
+           {"eylem": "kaydir", "mesaj": "Şifre alanını buldum."},
+           {"eylem": "bitir", "sonuc": "x"}])
+    o = calistir(yerel_tarayici_ac)
+    assert [x["metin"] for x in o if x["tur"] == "anlatim"] == ["Giriş sayfasına bakıyorum.", "Şifre alanını buldum."]
+
+
+def test_anlatimda_sifre_gizlenir(sahte, yerel_tarayici_ac, site):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html", "mesaj": "Parola-7788 ile gireceğim"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac, metin=f"{site}/giris.html şifrem Parola-7788 ile gir")
+    anlatim = [x["metin"] for x in o if x["tur"] == "anlatim"]
+    assert anlatim and "Parola-7788" not in anlatim[0] and "•••" in anlatim[0]
+
+
+def test_sistem_promptu_mesaj_alanini_anlatir():
+    assert '"mesaj"' in gorev.promptlar.SISTEM
+
+
+@pytest.mark.parametrize("eylemler,komutlar,beklenen", [
+    ([{"eylem": "bitir", "sonuc": "x"}], [], "tamamlandi"),
+    ([{"eylem": "git", "url": "{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}], ["durdur"], "durduruldu"),
+    ([{"eylem": "kaydir"}] * 5, [], "adim_siniri"),
+])
+def test_gorev_bitis_durumu_bildirilir(sahte, yerel_tarayici_ac, site, monkeypatch, eylemler, komutlar, beklenen):
+    monkeypatch.setattr(gorev.ayar, "MAKS_ADIM", 3)
+    sahte([{k: (v.format(site=site) if isinstance(v, str) else v) for k, v in e.items()} for e in eylemler])
+    o = calistir(yerel_tarayici_ac, komutlar=komutlar)
+    bitis = [x for x in o if x["tur"] == "gorev_bitti"]
+    assert len(bitis) == 1 and bitis[0]["durum"] == beklenen
+    assert turler(o).index("gorev_bitti") < turler(o).index("cevap_bitti")
+
+
+def test_sekme_kapaninca_bitis_durumu(sahte, yerel_tarayici_ac, site):
+    kayit = {}
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "kaydir"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None):
+        karar = asil(model, istem, ekran)
+        if karar["eylem"] == "kaydir":
+            kayit["t"].sayfa.close()
+        return karar
+    gorev.karar.karar_al = akilli
+    o = calistir(yerel_tarayici_ac, kayit=kayit)
+    assert [x["durum"] for x in o if x["tur"] == "gorev_bitti"] == ["sekme_kapandi"]
+    isinde(kayit["t"]._kapat_asil)

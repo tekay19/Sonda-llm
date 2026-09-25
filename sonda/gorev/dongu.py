@@ -47,10 +47,10 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     notlar, adimlar, hafiza_ = durum["notlar"], durum["adimlar"], durum["hafiza"]
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
-    yapilan, erken_red, form_red = 0, False, False
+    yapilan, erken_red, form_red, son_mesaj = 0, False, False, ""
     for adim_no in range(1, maks + 1):
         if g.durdu.is_set():
-            durum["hal"] = "Kullanıcı görevi durdurdu."
+            durum["kod"], durum["hal"] = "durduruldu", "Kullanıcı görevi durdurdu."
             return
         sayfa, ekran = bak(t, ekran_iste)
         if iki_adim_mi(sayfa):
@@ -60,6 +60,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             if komut not in ("devam", "otomatik"):
                 durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                 else "Kullanıcı 15 dakika içinde doğrulamayı yapmadığı için görev bitti.")
+                durum["kod"] = "durduruldu" if komut == "durdur" else "zaman_asimi"
                 return
             geri_bildirim, son_imza, tekrar = IKI_ADIM_TAMAM, None, 0
             sayfa, ekran = bak(t, ekran_iste)
@@ -72,6 +73,12 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             adimlar.append(f"{adim_no}. (geçersiz cevap)")
             continue
         e = karar["eylem"]
+        mesaj = str(karar.get("mesaj") or "").strip()[:300]
+        for gizli in koruma.gizli_adaylar(gorev_metni) | durum["gizli"]:
+            mesaj = mesaj.replace(gizli, "•••")
+        if mesaj and mesaj != son_mesaj:
+            yield {"tur": "anlatim", "metin": mesaj}
+            son_mesaj = mesaj
         dusunce = str(karar.get("dusunce") or "").strip()[:200]
         dusunce_ek = f" — düşünce: {dusunce}" if dusunce else ""
         if e in ("bitir", "sana_birak") and not form_red and (eksik_alan := eksik_form_alanlari(sayfa["ogeler"], gorev_metni)):
@@ -100,6 +107,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 adimlar.append(f"{adim_no}. bitirmek istedi, sayfalar tam incelenmediği için devam{dusunce_ek}")
                 continue
             durum["sonuc"], durum["hal"] = str(karar.get("sonuc", "")), "Görev tamamlandı."
+            durum["kod"] = "tamamlandi"
             return
 
         imza = json.dumps({k: v for k, v in karar.items() if k != "dusunce"}, sort_keys=True, ensure_ascii=False)
@@ -150,6 +158,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             if komut != "devam":
                 durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
                                 else "Kullanıcı 15 dakika yanıt vermediği için görev bitti.")
+                durum["kod"] = "durduruldu" if komut == "durdur" else "zaman_asimi"
                 return
             geri_bildirim, son_imza, tekrar = DEVAM_METNI, None, 0
             continue
@@ -183,7 +192,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             hafiza_.eylem(onceki_url, "kaydırıldı")
         elif e != "git":
             hafiza_.eylem(onceki_url, olay["metin"][:80])
-    durum["hal"] = f"Adım sınırı ({maks}) doldu; görev yarım kalmış olabilir."
+    durum["kod"], durum["hal"] = "adim_siniri", f"Adım sınırı ({maks}) doldu; görev yarım kalmış olabilir."
 
 
 def sonuc_yaz(model, gorev_metni, durum):
@@ -225,11 +234,12 @@ def yurut(g, gorev_metni, onceki, model, tarayici_ac):
         yield from dongu(g, gorev_metni, onceki, model, t, durum, derinlik)
     except tarayici.SekmeKapandi:
         yield adim("hata", "Sonda'nın sekmesi kapatıldı, görev durdu")
-        durum["hal"] = "Sonda'nın sekmesi kapatıldığı için görev yarıda kaldı."
+        durum["kod"], durum["hal"] = "sekme_kapandi", "Sonda'nın sekmesi kapatıldığı için görev yarıda kaldı."
     finally:
         try:
             t.kapat()
         except Exception:
             pass
     if not g.koptu:
+        yield {"tur": "gorev_bitti", "durum": durum.get("kod", "tamamlandi")}
         yield from sonuc_yaz(model, gorev_metni, durum)

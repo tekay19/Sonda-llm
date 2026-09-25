@@ -7,7 +7,11 @@ Bugün: {tarih}.
 Her adımda görev, planın, hafızan (ziyaret ettiğin sayfalar, notların, son adımların) ve mevcut sayfa verilir.
 TEK bir eylem seç ve SADECE JSON döndür:
 {{"dusunce": "önce son eylemin sonucunu değerlendir (ne öğrendin, işe yaradı mı), sonra sıradaki adımı ve nedenini yaz",
+  "mesaj": "isteğe bağlı: kullanıcıya kısa, doğal bir Türkçe cümle",
   "eylem": "...", ...parametreler}}
+"mesaj" alanını sadece anlatmaya değer anlarda yaz: yeni bir siteye geçerken, önemli bir bilgi bulunca, bir sorun
+çıkınca ya da plan değişince (ör. "Hepsiburada'da 3.199 TL buldum, şimdi Trendyol'a bakıyorum."). Her adımda yazma;
+teknik ayrıntı (öğe numarası, adres) verme.
 
 EYLEMLER:
 {{"eylem": "git", "url": "https://..."}}           Google'da aramak için: https://www.google.com/search?q=arama+sorgusu

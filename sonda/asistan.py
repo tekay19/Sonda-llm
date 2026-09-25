@@ -11,9 +11,10 @@ import threading
 import time
 
 from . import gorev, hafiza
-from .arastirma import derin, hizli
+from .arastirma import derin, hizli, sohbet
 from .arastirma.promptlar import HAFIZA_PROMPTU, ONERI_PROMPTU
 from .ortak import json_sor
+from .yonlendirme import yon_belirle
 
 
 # Birinci şahıs ifadeleri: hafıza çıkarımı sadece bunlar varsa çalışır (gereksiz model çağrısını önler)
@@ -57,7 +58,16 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
     cevap = ""
     try:
         if mod == "gorev":
-            uretec, oneri = gorev.calistir(soru, model, gecmis), False
+            # Görev modunda her mesaj tarayıcı açmasın: sohbet ve kısa bilgi soruları doğrudan cevaplanır
+            hedef = yon_belirle(model, soru, gecmis)
+            yield {"tur": "yon", "hedef": hedef}
+            oneri = False
+            if hedef == "gorev":
+                uretec = gorev.calistir(soru, model, gecmis)
+            elif hedef == "sohbet":
+                uretec = sohbet(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
+            else:
+                uretec = hizli(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
         else:
             uretec = (derin if mod == "derin" else hizli)(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
         for olay in uretec:
