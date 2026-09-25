@@ -136,7 +136,7 @@ def test_durdur_komutu_bekleyen_gorevi_bitirir(sahte, yerel_tarayici_ac, site):
 
 def test_bekleme_zaman_asimi(sahte, yerel_tarayici_ac, site, monkeypatch):
     monkeypatch.setattr(gorev, "BEKLEME_SURESI", 0.5)
-    sahte([{"eylem": "sana_birak", "sebep": "?"}])
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}])
     olaylar = []
     for x in gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac):
         olaylar.append(x)  # komut verilmez
@@ -196,7 +196,7 @@ def test_koruma_taze_oge_bilgisini_kullanir(sahte, yerel_tarayici_ac, site):
 
 
 def test_kopan_baglanti_gorevi_durdurur(sahte, yerel_tarayici_ac, site):
-    sahte([{"eylem": "sana_birak", "sebep": "?"}])
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}])
     akis = gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac)
     for o in akis:
         if o["tur"] == "kullaniciya":
@@ -242,11 +242,11 @@ def test_gorevler_ayni_kalici_is_parcaciginda_calisir(sahte, yerel_tarayici_ac):
     assert len(kimlikler) == 2 and kimlikler[0] == kimlikler[1] != threading.get_ident()
 
 
-def test_bekleme_sirasinda_nabiz_olayi(sahte, yerel_tarayici_ac, monkeypatch):
+def test_bekleme_sirasinda_nabiz_olayi(sahte, yerel_tarayici_ac, site, monkeypatch):
     """Kullanıcı beklenirken akış sessiz kalmamalı: arayüz koparsa sunucu bunu ancak bir şey yazınca fark eder
     ve generator'ı kapatır. Nabız yoksa yarım görev 15 dakika kuyruğu kilitler."""
     monkeypatch.setattr(gorev, "NABIZ_ARALIGI", 0.2)
-    sahte([{"eylem": "sana_birak", "sebep": "?"}])
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "sana_birak", "sebep": "?"}])
     akis = gorev.calistir("g", "sahte", tarayici_ac=yerel_tarayici_ac)
     for o in akis:
         if o["tur"] == "kullaniciya":
@@ -394,3 +394,44 @@ def test_tam_incelenen_sayfada_uyari_yok(sahte, yerel_tarayici_ac, site):
                {"eylem": "bitir", "sonuc": "x"}])
     calistir(yerel_tarayici_ac)
     assert len(m.istemler) == 3 and "Henüz bitirme" not in m.istemler[2]
+
+
+def test_hicbir_sey_yapmadan_devretme_reddedilir(sahte, yerel_tarayici_ac, site):
+    """Boş sekmede ilk adımda 'bana bırak' demek yerine önce sayfaya gidip yapılabilecek kısmı yapmalı."""
+    m = sahte([{"eylem": "sana_birak", "sebep": "şifre gerekiyor"},
+               {"eylem": "git", "url": f"{site}/giris.html"},
+               {"eylem": "sana_birak", "sebep": "şifre gerekiyor"}])
+    o = calistir(yerel_tarayici_ac)
+    assert "Önce" in m.istemler[1].split("SON EYLEMİN SONUCU:")[1]
+    assert turler(o).count("kullaniciya") == 1
+
+
+def test_sonuc_promptu_uydurmayi_yasaklar():
+    s = gorev.SONUC_PROMPTU.lower()
+    assert "yalnızca" in s and "son adımlar" in s
+
+
+def test_sistem_promptu_devretmeden_once_yapilabileni_ister():
+    assert "devretmeden önce" in gorev.SISTEM.lower()
+
+
+def test_gorevde_verilen_sifre_girilir_ve_gizlenir(sahte, yerel_tarayici_ac, site):
+    """Kullanıcı kararı: görevde verilen şifre, adı geçen sitede girilir; hiçbir olayda açık görünmez."""
+    kayit = {}
+    metin = f"{site}/giris.html sayfasında semih@ornek.com ve şifrem Parola-7788 ile giriş yap"
+    m = sahte([{"eylem": "git", "url": f"{site}/giris.html"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            satir = next(x for x in istem.splitlines() if "Şifre" in x and x.startswith("["))
+            return {"eylem": "yaz", "no": int(satir[1:satir.index("]")]), "metin": "Parola-7788"}
+        return asil(model, istem, ekran)
+    gorev._karar_al = akilli
+    o = calistir(yerel_tarayici_ac, metin=metin, kayit=kayit)
+    assert "kullaniciya" not in turler(o)
+    assert isinde(lambda: kayit["t"].sayfa.input_value("[name=sifre]")) == "Parola-7788"
+    assert not any("Parola-7788" in str(x.get("metin", "")) for x in o)
+    assert "Parola-7788" not in "\n".join(m.istemler[2:]).split("GÖREV:")[-1].split("\n\n", 1)[1]
+    isinde(kayit["t"]._kapat_asil)

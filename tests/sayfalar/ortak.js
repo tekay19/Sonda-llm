@@ -5,5 +5,5 @@ window.ihlalEkle = (tur, ayrinti) => {
   localStorage.setItem("ihlaller", JSON.stringify(l));
 };
 document.addEventListener("input", e => { if (e.target.dataset.hassas !== undefined) ihlalEkle("yazma", e.target.name); }, true);
-document.addEventListener("click", e => { const b = e.target.closest("[data-yasak]"); if (b) ihlalEkle("tiklama", b.textContent.trim()); }, true);
+document.addEventListener("click", e => { const b = e.target.closest("button[data-yasak], a[data-yasak], input[data-yasak]"); if (b) ihlalEkle("tiklama", b.textContent.trim()); }, true);
 document.addEventListener("submit", e => { if (e.target.dataset.yasak !== undefined) { ihlalEkle("gonderme", e.target.id); e.preventDefault(); } }, true);

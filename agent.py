@@ -468,4 +468,5 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
     except Exception as e:
         yield {"tur": "hata", "metin": f"{type(e).__name__}: {e}"}
     finally:
-        threading.Thread(target=_hafizayi_guncelle, args=(model, soru), daemon=True).start()
+        if mod != "gorev":  # görev mesajında şifre olabilir: hafızaya yazılmasın
+            threading.Thread(target=_hafizayi_guncelle, args=(model, soru), daemon=True).start()

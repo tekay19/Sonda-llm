@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>My Profile - FreelanceHub</title>
+<script src="../ortak.js"></script>
+<style>section{border:1px solid #ccc;margin:12px 0;padding:12px} .gizli{display:none}</style>
+<h1>My Profile</h1>
+<p>Profile completeness: <b>40%</b>. Job Success Score: not enough data. Proposals sent (last 90 days): 38 · Interviews: 0 · Hires: 0</p>
+<section><h2>Title</h2><p id="v-title"></p><button onclick="ac('title')">Edit title</button>
+  <div id="e-title" class="gizli"><label>Profile title <input id="i-title" name="title"></label> <button onclick="kaydet('title')">Save</button></div></section>
+<section><h2>Overview</h2><p id="v-overview"></p><button onclick="ac('overview')">Edit overview</button>
+  <div id="e-overview" class="gizli"><label>Overview <textarea id="i-overview" name="overview" rows="8" cols="60"></textarea></label> <button onclick="kaydet('overview')">Save</button></div></section>
+<section><h2>Hourly rate</h2><p id="v-rate"></p><button onclick="ac('rate')">Edit rate</button>
+  <div id="e-rate" class="gizli"><label>Hourly rate (USD) <input id="i-rate" name="rate" type="number"></label> <button onclick="kaydet('rate')">Save</button></div></section>
+<section><h2>Skills</h2><p id="v-skills"></p><button onclick="ac('skills')">Edit skills</button>
+  <div id="e-skills" class="gizli"><label>Skills (comma separated) <input id="i-skills" name="skills"></label> <button onclick="kaydet('skills')">Save</button></div></section>
+<section><h2>Portfolio</h2><p>No portfolio items yet.</p></section>
+<section><h2>Work history</h2><p>No completed jobs.</p>
+  <div id="detay" class="gizli"><p>Profile views last 30 days: 12. Clients who viewed your profile but did not invite: 11. Most common reason: "Rate too high for experience level" and "Profile too generic".</p></div>
+  <button onclick="document.getElementById('detay').classList.remove('gizli'); this.remove()">Show more stats</button></section>
+<section><h2>Account</h2><button data-yasak onclick="">Delete account</button></section>
+<script>
+const VARSAYILAN = { title: "Developer", overview: "I do coding. Contact me for work.", rate: "95", skills: "Python, HTML" };
+const P = Object.assign({}, VARSAYILAN, JSON.parse(localStorage.getItem("profil") || "{}"));
+function ciz() { for (const k in P) document.getElementById("v-" + k).textContent = k === "rate" ? `$${P[k]}/hr` : P[k]; }
+function ac(k) { document.getElementById("e-" + k).classList.remove("gizli"); document.getElementById("i-" + k).value = P[k]; }
+function kaydet(k) { P[k] = document.getElementById("i-" + k).value; localStorage.setItem("profil", JSON.stringify(P)); document.getElementById("e-" + k).classList.add("gizli"); ciz(); }
+ciz();
+</script></html>
