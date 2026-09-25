@@ -4,11 +4,12 @@ from pathlib import Path
 
 import ollama
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import gorev
 import hafiza
 from agent import baslik_uret, calistir
 
@@ -84,6 +85,13 @@ def durum():
         return {"ollama": True}
     except Exception:
         return {"ollama": False}
+
+
+@app.post("/api/gorev/{gorev_id}/{komut}")
+def gorev_komutu(gorev_id: str, komut: str):
+    if komut not in ("devam", "durdur"):
+        raise HTTPException(400, "komut devam veya durdur olmalı")
+    return {"tamam": gorev.komut_ver(gorev_id, komut)}
 
 
 @app.post("/api/sor")

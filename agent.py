@@ -5,6 +5,7 @@
   sifirla  -> o ana kadar yazılan taslağı temizle (model araca döndü)
   oneriler -> takip soruları
   bitti / hata
+Görev modu olayları (gorev_basladi, kullaniciya, devam_edildi) gorev.py'de tanımlıdır.
 """
 import json
 import re
@@ -451,7 +452,12 @@ def calistir(soru, gecmis, model, mod, onceki_kaynaklar=(), diger_sohbetler=(), 
     basla = time.time()
     cevap = ""
     try:
-        for olay in (derin if mod == "derin" else hizli)(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler):
+        if mod == "gorev":
+            import gorev  # geç içe aktarma: gorev.py agent.py'den içe aktarır
+            uretec, oneri = gorev.calistir(soru, model, gecmis), False
+        else:
+            uretec = (derin if mod == "derin" else hizli)(soru, gecmis, model, onceki_kaynaklar, diger_sohbetler)
+        for olay in uretec:
             if olay["tur"] == "cevap_bitti":
                 cevap = olay["metin"]
                 continue
