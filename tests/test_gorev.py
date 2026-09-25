@@ -1010,3 +1010,42 @@ def test_onceki_mesajdaki_sifre_kayitta_ve_istemde_gizlenir(sahte, yerel_tarayic
     assert "Parola-7788" not in "\n".join(m.istemler)
     assert "Parola-7788" not in "".join(p.read_text(encoding="utf-8") for p in tmp_path.glob("*.jsonl"))
     assert not any("evil.example" in str(x.get("metin", "")) for x in o if x["tur"] == "adim")
+
+
+# ---- Model testi: 60 karakterde kesilen değer yüzünden aynı metin 16 kez yazıldı
+def test_uzun_deger_kesildigi_belli_ve_uzunlugu_gosterilir():
+    from sonda.gorev.sayfa import oge_satiri
+    o = {"no": 3, "etiket": "textarea", "rol": "", "tip": "", "ad": "overview", "kimlik": "", "otomatik": "", "yer": "",
+         "aria": "", "baslik": "", "metin": "Overview", "deger": "Hi there! " * 8, "uzunluk": 412, "href": "", "form": -1,
+         "form_eylem": "", "ekranda": True}
+    satir = oge_satiri(o)
+    assert "…" in satir and "412 karakter" in satir
+
+
+def test_yazinca_uzunluk_geri_bildirilir(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None, dusun=False):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            satir = next(x for x in istem.splitlines() if "Ön yazı" in x and x.startswith("["))
+            return {"eylem": "yaz", "no": int(satir[1:satir.index("]")]), "metin": "x" * 300}
+        return asil(model, istem, ekran, dusun)
+    gorev.karar.karar_al = akilli
+    calistir(yerel_tarayici_ac)
+    geri = m.istemler[2].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+    assert "300 karakter" in geri
+    assert "300 karakter" in m.istemler[2].split("MEVCUT SAYFA")[1]
+
+
+def test_iki_eylem_arasinda_gidip_gelmek_takilma_sayilir(sahte, yerel_tarayici_ac, site):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}] + [{"eylem": "kaydir", "yon": "asagi"}, {"eylem": "geri"}] * 6)
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
+    assert "kullaniciya" in turler(o)
+
+
+def test_ayni_alana_farkli_metinle_tekrar_yazmak_takilma_sayilir(sahte, yerel_tarayici_ac, site):
+    sahte([{"eylem": "git", "url": f"{site}/basvuru.html"}] + [{"eylem": "yaz", "no": 1, "metin": f"Semih {i}"} for i in range(8)])
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
+    assert "kullaniciya" in turler(o)

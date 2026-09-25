@@ -23,7 +23,8 @@ def uygula(t, karar, gorev_metni, notlar, oge):
         not_ = " (Enter yalnızca arama kutularında çalışır; basılmadı. Gerekirse ilgili butona tıkla.)" \
             if karar.get("enter") and not karar.get("enter_izni") else ""
         yazilan = "•••" if karar.get("gizli") else karar["metin"][:60]
-        return adim("gir", f"“{ad}” alanına “{yazilan}” yazıldı{ek}"), f"Yazıldı{ek}.{not_}"
+        uzunluk = "" if karar.get("gizli") else f" Alanda artık {len(str(karar['metin']))} karakter var (yazdığın metnin tamamı)."
+        return adim("gir", f"“{ad}” alanına “{yazilan}” yazıldı{ek}"), f"Yazıldı{ek}.{uzunluk}{not_}"
     if e == "sec":
         t.sec(karar["no"], karar["deger"])
         secilen = "•••" if karar.get("gizli") else karar["deger"]

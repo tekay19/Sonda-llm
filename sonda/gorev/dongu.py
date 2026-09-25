@@ -74,7 +74,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
     maks = min(ayar.MAKS_ADIM, derinlik["maks_adim"])
     geri_bildirim, ekran_iste, son_imza, tekrar, bitir_red = "", False, None, 0, 0
     yapilan, erken_red, form_red, son_mesaj = 0, False, False, ""
-    captcha_denenen, son_okuma = set(), None
+    captcha_denenen, son_okuma, son_imzalar = set(), None, []
     durum["gizli"].update(koruma.gizli_adaylar(gorev_metni))
     kayit = GorevKaydi(g.id, durum["gizli"])
     def ilerleme():  # not sayısı ve açılan gerçek sayfa sayısı
@@ -189,9 +189,13 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             durum["kod"] = "tamamlandi"
             return
 
-        imza = json.dumps({k: v for k, v in karar.items() if k != "dusunce"}, sort_keys=True, ensure_ascii=False)
+        imza = (f"{e}:{karar.get('no')}" if e in ("yaz", "sec") else  # aynı alana farklı metin de tekrardır
+                json.dumps({k: v for k, v in karar.items() if k not in ("dusunce", "mesaj")}, sort_keys=True, ensure_ascii=False))
         tekrar = tekrar + 1 if imza == son_imza and e != "kaydir" else 1
         son_imza = imza
+        son_imzalar = (son_imzalar + [imza])[-6:]
+        # iki eylem arasında gidip gelmek de takılmadır (ör. "Edit overview" <-> yaz)
+        salinim = len(son_imzalar) == 6 and len(set(son_imzalar)) == 2 and             all(x != y for x, y in zip(son_imzalar, son_imzalar[1:]))  # A-B-A-B-A-B
         if tekrar == ayar.TAKILMA_EKRAN:
             ekran_iste = True
 
@@ -204,7 +208,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             continue
         if e == "sana_birak":
             sebep = str(karar["sebep"])
-        elif tekrar >= ayar.TAKILMA_DEVRET:
+        elif tekrar >= ayar.TAKILMA_DEVRET or salinim:
             sebep = "Aynı adımı tekrar tekrar deniyorum, takıldım. Sayfaya bakıp yardım eder misin?"
         oge = None
         if not sebep and e in ("tikla", "yaz", "sec"):
@@ -231,7 +235,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 continue
 
         if sebep:
-            if e == "sana_birak" or tekrar >= ayar.TAKILMA_DEVRET:
+            if e == "sana_birak" or tekrar >= ayar.TAKILMA_DEVRET or salinim:
                 adimlar.append(f"{adim_no}. kullanıcıya bırakıldı: {sebep[:100]}")
             komut = yield from devret(g, sebep, gizliler=durum["gizli"])
             if komut != "devam":
@@ -239,7 +243,7 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                                 else "Kullanıcı 15 dakika yanıt vermediği için görev bitti.")
                 durum["kod"] = "durduruldu" if komut == "durdur" else "zaman_asimi"
                 return
-            geri_bildirim, son_imza, tekrar = DEVAM_METNI, None, 0
+            geri_bildirim, son_imza, tekrar, son_imzalar = DEVAM_METNI, None, 0, []
             continue
 
         if e == "captcha":

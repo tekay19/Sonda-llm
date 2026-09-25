@@ -20,6 +20,7 @@ ACIKLA = r"""(e) => {
     aria: e.getAttribute('aria-label') || '', baslik: e.getAttribute('title') || '',
     metin: yazi(metin).slice(0, 120),
     deger: (girdi ? String(e.value || '') : '').slice(0, 80),
+    uzunluk: girdi ? String(e.value || '').length : 0,
     href: e.tagName === 'A' ? (e.href || '') : '',
     form: form ? [...document.forms].indexOf(form) : -1,
     form_eylem: form ? (form.getAttribute('action') || '') : '',

@@ -96,7 +96,13 @@ def oge_satiri(o, sayfa_url=""):
         # value="on" işaretli demek değildir; model yanılmasın (KVKK kutusu işaretlendi sanıldı)
         satir += " (işaretli)" if o.get("secili") else " (işaretsiz)"
     elif o["deger"] and tur not in ("buton",):
-        satir += ' = "***"' if hassas else f' = "{o["deger"][:60]}"'
+        uzunluk = max(o.get("uzunluk") or 0, len(o["deger"]))
+        if hassas:
+            satir += ' = "***"'
+        elif uzunluk > 60:  # kesildiği belli olsun: model yarım sanıp tekrar yazmasın
+            satir += f' = "{o["deger"][:60]}…" ({uzunluk} karakter)'
+        else:
+            satir += f' = "{o["deger"]}"'
     if o.get("secenekler"):
         satir += " seçenekler: " + " | ".join(o["secenekler"][:12])
     if hassas:
