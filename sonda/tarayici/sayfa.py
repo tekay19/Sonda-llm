@@ -1,10 +1,14 @@
 """Tek bir sekmenin kontrolü: bak, tıkla, yaz, kaydır... Güvenlik kararları koruma.py'dedir; burası uygular."""
 import trafilatura
 
-from .js import BAK, BILGI
+from .js import BAK, BILGI, CAPTCHA_ADRESLERI, CAPTCHA_KUTULARI, ENGEL
 
 
 ZAMAN_ASIMI = 20000
+
+
+class TiklamaEngeli(Exception):
+    """Tıklanacak öğenin üstünde başka bir öğe (çerez bildirimi, pop-up) var."""
 
 
 class SekmeKapandi(Exception):
@@ -71,7 +75,27 @@ class Tarayici:
         return self.sayfa.locator(f'[data-sonda-id="{int(no)}"]').first
 
     def bak(self):
-        return self.sayfa.evaluate(BAK)
+        sayfa = self.sayfa.evaluate(BAK)
+        sayfa["captcha"] = bool(self._captcha_cerceveleri())
+        return sayfa
+
+    def _captcha_cerceveleri(self):
+        ana = self.sayfa.main_frame
+        return [f for f in self.sayfa.frames if f is not ana and any(a in f.url for a in CAPTCHA_ADRESLERI)]
+
+    def captcha_onayla(self):
+        """Robot doğrulamasının onay kutusunu işaretler (kullanıcı izin verdi). Resimli bulmaca çözülmez."""
+        for cerceve in self._captcha_cerceveleri():
+            for secici in CAPTCHA_KUTULARI:
+                kutu = cerceve.locator(secici).first
+                try:
+                    if kutu.count():
+                        kutu.click(timeout=5000)
+                        self._bekle()
+                        return True
+                except Exception:
+                    continue
+        return False
 
     def oge_bilgisi(self, no):
         return self.sayfa.evaluate(BILGI, int(no))
@@ -83,7 +107,19 @@ class Tarayici:
     def tikla(self, no):
         loc = self._loc(no)
         loc.evaluate("e => { const a = e.closest('a'); if (a && a.target) a.removeAttribute('target'); }")
-        loc.click(timeout=5000)
+        try:
+            loc.click(timeout=4000)
+        except Exception:
+            # Upwork'te görülen zaman aşımı: çoğunlukla üstte çerez bildirimi/pop-up vardır; modele nedenini söyle
+            try:
+                engel = loc.evaluate(ENGEL, timeout=3000)
+            except Exception:
+                engel = None
+            if engel:
+                raise TiklamaEngeli(f"Tıklanacak öğenin üstünde başka bir öğe var: “{engel}”. Önce onu kapat "
+                                    "(ör. çerezleri kabul et / pop-up'ı kapat) ya da sayfayı kaydır.") from None
+            loc.scroll_into_view_if_needed(timeout=3000)
+            loc.click(timeout=4000)
         self._bekle()
 
     def yaz(self, no, metin, enter=False):

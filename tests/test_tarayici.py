@@ -175,3 +175,37 @@ def test_daha_fazla_goster_butonu_icerik_acar(tarayici, site):
     tarayici.git(f"{site}/uzun.html")
     tarayici.tikla(bul(tarayici.bak(), "Daha fazla göster")["no"])
     assert "gizli yorum açıldı" in tarayici.bak()["metin"]
+
+
+
+def test_ustu_kapali_butona_tiklama_engeli_soyler(tarayici, site):
+    """Upwork'te görülen: tıklama zaman aşımı. Üstünde çerez/pop-up varsa model nedenini öğrenmeli."""
+    from sonda.tarayici import TiklamaEngeli
+    tarayici.git(f"{site}/engel.html")
+    with pytest.raises(TiklamaEngeli) as h:
+        tarayici.tikla(bul(tarayici.bak(), "Devam et")["no"])
+    assert "Tümünü kabul et" in str(h.value) or "çerez" in str(h.value)
+    tarayici.tikla(bul(tarayici.bak(), "Tümünü kabul et")["no"])
+    tarayici.tikla(bul(tarayici.bak(), "Devam et")["no"])
+    assert tarayici.sayfa.inner_text("#sonuc") == "Devam edildi"
+
+
+def test_kaydirilan_alandaki_butona_tiklanir(tarayici, site):
+    tarayici.git(f"{site}/engel.html")
+    tarayici.sayfa.evaluate("document.getElementById('cerez').remove()")
+    tarayici.tikla(bul(tarayici.bak(), "İçteki buton")["no"])
+    assert tarayici.sayfa.inner_text("#sonuc") == "İçteki tıklandı"
+
+
+def test_captcha_algilanir_ve_onay_kutusu_isaretlenir(tarayici, site):
+    tarayici.git(f"{site}/captcha.html")
+    assert tarayici.bak()["captcha"] is True
+    assert tarayici.captcha_onayla() is True
+    assert tarayici.sayfa.inner_text("#durum") == "Doğrulandı"
+    assert tarayici.bak()["captcha"] is False
+
+
+def test_captcha_olmayan_sayfa(tarayici, site):
+    tarayici.git(f"{site}/giris.html")
+    assert tarayici.bak()["captcha"] is False
+    assert tarayici.captcha_onayla() is False

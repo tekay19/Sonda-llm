@@ -1,0 +1,11 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Engelli sayfa</title>
+<button id="devam" onclick="document.getElementById('sonuc').textContent = 'Devam edildi'">Devam et</button>
+<p id="sonuc"></p>
+<div id="kutu" style="height:100px; overflow:auto; border:1px solid #999">
+  <div style="height:900px"></div>
+  <button onclick="document.getElementById('sonuc').textContent = 'İçteki tıklandı'">İçteki buton</button>
+</div>
+<div id="cerez" style="position:fixed; inset:0; background:rgba(0,0,0,.6); display:grid; place-items:center">
+  <div style="background:#fff; padding:20px">Bu site çerez kullanır.
+    <button onclick="document.getElementById('cerez').remove()">Tümünü kabul et</button></div>
+</div></html>

@@ -62,5 +62,5 @@ def derinlik_belirle(model, gorev_metni, onceki):
         min_site = 2
     plan = veri.get("plan") if isinstance(veri.get("plan"), list) else []
     plan = [a.strip() for a in plan if isinstance(a, str) and a.strip()][:6]
-    return {"derinlik": derinlik, "min_site": max(1, min(5, min_site)),
+    return {"derinlik": derinlik, "min_site": max(1, min(5, min_site)), "inceleme": veri.get("inceleme") is True,
             "maks_adim": min(ayar.MAKS_ADIM, ayar.ADIM_SINIRI[derinlik]), "plan": plan}

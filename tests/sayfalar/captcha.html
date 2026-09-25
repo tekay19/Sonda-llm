@@ -1,0 +1,12 @@
+<!doctype html><html lang="tr"><meta charset="utf-8"><title>Robot kontrolü</title>
+<h1>Devam etmeden önce doğrulayın</h1>
+<iframe id="cf" src="captcha_kutusu.html?challenges.cloudflare.com" width="320" height="80"></iframe>
+<p id="durum">Doğrulanmadı</p>
+<script>
+const resimli = new URLSearchParams(location.search).get("resimli");
+addEventListener("message", e => {
+  if (e.data !== "dogrulandi") return;
+  if (resimli) return;  // resimli bulmaca: onay kutusu yetmez, kullanıcı çözmeli
+  document.getElementById("cf").remove(); document.getElementById("durum").textContent = "Doğrulandı";
+});
+</script></html>

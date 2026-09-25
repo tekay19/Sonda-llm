@@ -36,5 +36,9 @@ TAM_GORULDU = 90
 IKI_ADIM_KONTROL = 2  # saniye: kullanıcı doğrulamayı bitirdi mi diye sayfaya bakma aralığı
 
 
+SAYFA_METNI = 8000  # sayfa başına biriktirilen görülen metin (karakter)
+SONUC_ICERIK = 15000  # son cevaba giden görülen içerik (karakter)
+CAPTCHA_BEKLE = 3  # saniye: onay kutusundan sonra resimli bulmaca çıktı mı diye bekleme
+
 EYLEMLER = {"git": ["url"], "tikla": ["no"], "yaz": ["no", "metin"], "sec": ["no", "deger"], "kaydir": [],
-            "geri": [], "bak": [], "oku": [], "not_al": ["metin"], "sana_birak": ["sebep"], "bitir": []}
+            "geri": [], "bak": [], "oku": [], "not_al": ["metin"], "sana_birak": ["sebep"], "bitir": [], "captcha": []}

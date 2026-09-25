@@ -3,6 +3,8 @@ import threading
 import pytest
 
 from sonda import gorev
+
+ORIJINAL_SONUC_YAZ = gorev.dongu.sonuc_yaz
 from conftest import ihlaller
 
 DERINLIK = {"derinlik": "basit", "min_site": 1, "maks_adim": 40, "plan": []}
@@ -644,3 +646,122 @@ def test_sekme_kapaninca_bitis_durumu(sahte, yerel_tarayici_ac, site):
     o = calistir(yerel_tarayici_ac, kayit=kayit)
     assert [x["durum"] for x in o if x["tur"] == "gorev_bitti"] == ["sekme_kapandi"]
     isinde(kayit["t"]._kapat_asil)
+
+
+
+def test_derinlik_promptu_mevcut_oturumu_bilir():
+    """Upwork denemesinde plan 'giriş yap, kimlik bilgilerini gir' diyordu; kullanıcı zaten girişliydi."""
+    p = gorev.promptlar.DERINLIK_PROMPTU.lower()
+    assert "mevcut oturum" in p and "giriş" in p
+
+
+def test_tiklama_engeli_modele_neden_olarak_doner(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/engel.html"}])
+    asil = m.__call__
+
+    def akilli(model, istem, ekran=None):
+        if len(m.istemler) == 1:
+            m.istemler.append(istem)
+            satir = next(x for x in istem.splitlines() if "Devam et" in x and x.startswith("["))
+            return {"eylem": "tikla", "no": int(satir[1:satir.index("]")])}
+        return asil(model, istem, ekran)
+    gorev.karar.karar_al = akilli
+    calistir(yerel_tarayici_ac)
+    geri = m.istemler[2].split("SON EYLEMİN SONUCU:")[1][:400]
+    assert "Tümünü kabul et" in geri or "çerez" in geri
+
+
+def test_captcha_eylemi_onay_kutusunu_isaretler(sahte, yerel_tarayici_ac, site):
+    m = sahte([{"eylem": "git", "url": f"{site}/captcha.html"}, {"eylem": "captcha"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac)
+    assert "kullaniciya" not in turler(o)
+    assert "Doğrulandı" in m.istemler[2] and "robot doğrulaması (captcha) var" not in m.istemler[2]
+
+
+def test_resimli_captcha_kullaniciya_birakilir_ve_otomatik_devam(sahte, yerel_tarayici_ac, site, monkeypatch):
+    monkeypatch.setattr(gorev.ayar, "IKI_ADIM_KONTROL", 0.3)
+    monkeypatch.setattr(gorev.ayar, "CAPTCHA_BEKLE", 0.5)
+    sahte([{"eylem": "git", "url": f"{site}/captcha.html?resimli=1"}, {"eylem": "captcha"}, {"eylem": "bitir"}])
+    o = calistir(yerel_tarayici_ac, komutlar=["durdur"])
+    kul = [x for x in o if x["tur"] == "kullaniciya"]
+    assert len(kul) == 1 and "robot" in kul[0]["sebep"].lower()
+
+
+def test_sistem_promptu_captcha_eylemini_anlatir():
+    assert '"captcha"' in gorev.promptlar.SISTEM
+
+
+
+# ---- Upwork profil incelemesi: "more" tıklanmadı, kaydırılmadı, öz değerlendirme zayıftı
+@pytest.mark.parametrize("metin", ["more", "… more", "...more", "Devamı", "Show all", "See more"])
+def test_tek_basina_more_linki_tanınır(metin):
+    from sonda.gorev.sayfa import _daha_fazla_mi
+    o = {"etiket": "a", "tip": "", "rol": "", "metin": metin, "aria": "", "yer": "", "baslik": "", "ad": ""}
+    assert _daha_fazla_mi(o)
+
+
+@pytest.mark.parametrize("metin", ["Moreover", "Morelli Store", "Amore mio"])
+def test_more_gecen_normal_metin_tanınmaz(metin):
+    from sonda.gorev.sayfa import _daha_fazla_mi
+    o = {"etiket": "a", "tip": "", "rol": "", "metin": metin, "aria": "", "yer": "", "baslik": "", "ad": ""}
+    assert not _daha_fazla_mi(o)
+
+
+def test_derinlik_inceleme_bayragini_dondurur(monkeypatch):
+    class Y:
+        def __init__(self, icerik):
+            self.message = type("M", (), {"content": icerik})()
+    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "derin", "min_site": 1, "inceleme": true, "plan": []}'))
+    assert gorev.karar.derinlik_belirle("m", "profilimi incele", "")["inceleme"] is True
+    monkeypatch.setattr(gorev.karar.ollama, "chat", lambda **k: Y('{"derinlik": "basit", "min_site": 1}'))
+    assert gorev.karar.derinlik_belirle("m", "dolar kaç", "")["inceleme"] is False
+
+
+def test_derinlik_promptu_incelemeyi_derin_sayar():
+    p = gorev.promptlar.DERINLIK_PROMPTU.lower()
+    assert '"inceleme"' in p and "analiz" in p
+
+
+def test_inceleme_gorevinde_yarim_bakilan_sayfa_ile_bitirilmez(sahte, yerel_tarayici_ac, site, monkeypatch):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "Giriş formu var"},
+           {"eylem": "git", "url": f"{site}/uzun.html"},  # not alınmadı ama inceleme görevinde tamamı görülmeli
+           {"eylem": "bitir"}, {"eylem": "bitir"}, {"eylem": "bitir"}])
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 40, "plan": [], "inceleme": True})
+    m = gorev.karar.karar_al
+    calistir(yerel_tarayici_ac)
+    geri = m.istemler[4].split("SON EYLEMİN SONUCU:")[1].split("MEVCUT SAYFA")[0]
+    assert "Henüz bitirme" in geri and "uzun.html" in geri
+
+
+def test_inceleme_gorevinde_tam_bakilan_sayfa_ile_bitirilir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    sahte([{"eylem": "git", "url": f"{site}/giris.html"}, {"eylem": "not_al", "metin": "Giriş formu var"}, {"eylem": "bitir"}])
+    monkeypatch.setattr(gorev.karar, "derinlik_belirle",
+                        lambda *a: {"derinlik": "derin", "min_site": 1, "maks_adim": 40, "plan": [], "inceleme": True})
+    m = gorev.karar.karar_al
+    calistir(yerel_tarayici_ac)
+    assert len(m.istemler) == 3
+
+
+def test_gorulen_metin_son_cevaba_ulasir(sahte, yerel_tarayici_ac, site, monkeypatch):
+    """Son analiz sadece kısa notlardan değil, kaydırırken görülen gerçek sayfa içeriğinden yazılmalı."""
+    sahte([{"eylem": "git", "url": f"{site}/uzun.html"}] + [{"eylem": "kaydir", "yon": "asagi"}] * 14 + [{"eylem": "bitir"}])
+    monkeypatch.setattr(gorev.dongu, "sonuc_yaz", ORIJINAL_SONUC_YAZ)
+    istemler = []
+
+    class P:
+        def __init__(self, c):
+            self.message = type("M", (), {"content": c})()
+
+    def sahte_chat(**k):
+        istemler.append(k["messages"][-1]["content"])
+        return iter([P("ANALİZ")])
+    monkeypatch.setattr(gorev.dongu.ollama, "chat", sahte_chat)
+    calistir(yerel_tarayici_ac)
+    assert "Bölüm 1 " in istemler[0] and "Bölüm 30" in istemler[0] and "GÖRÜLEN" in istemler[0]
+
+
+def test_sonuc_promptu_analiz_yapisini_ister():
+    p = gorev.promptlar.SONUC_PROMPTU.lower()
+    for ifade in ("güçlü", "zayıf", "öneri", "kanıt"):
+        assert ifade in p, ifade

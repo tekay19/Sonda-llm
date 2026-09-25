@@ -7,14 +7,21 @@ from . import ayar
 
 # "Daha fazlasını gör" türü butonlar modele ayrıca işaretlenir: sayfanın gizli içeriğini açarlar
 _DAHA_FAZLA = re.compile(r"daha fazla|devamini|tumunu (gor|goster)|hepsini gor|diger yorum|sonraki|show more"
-                         r"|load more|see (more|all)|read more|view (more|all)|more results|\bnext\b|expand")
+                         r"|load more|see (more|all)|read more|view (more|all)|more results|\bnext\b|expand"
+                         r"|show all|devami")
 
 
+_CUMLE = re.compile(r"(?<=[.!?])\s+|\s{2,}")
+_ARAMA_MOTORU = re.compile(r"google\.[a-z.]+/search|bing\.com/search|duckduckgo\.com")
 _SAYFALAMA = re.compile(r"sonraki|\bnext\b")  # sayfalama butonu her zaman durur; "açılmamış içerik" sayılmaz
 
 
 def _daha_fazla_mi(o):
     ad = o["metin"] or o["aria"] or o["yer"] or o["baslik"] or o["ad"]
+    # Upwork gibi siteler metni kesip sonuna yalnızca "more" / "… more" koyar
+    kisa = koruma.sade(ad).strip(" .…")
+    if kisa == "more" or kisa.endswith(" more"):
+        return True
     return bool(_DAHA_FAZLA.search(koruma.sade(f"{ad} {o['aria']}")))
 
 
@@ -97,6 +104,8 @@ def sayfa_ozeti(sayfa):
     if k:
         konum = (f"\nKonum: sayfanın %{gorulen_yuzde(k)}'i görüldü. Aşağıda daha fazla içerik var; tamamını görmek "
                  "için kaydır." if k["y"] + k["ekran"] < k["yukseklik"] - 50 else "\nKonum: sayfanın sonundasın.")
+    if sayfa.get("captcha"):
+        konum += '\nSayfada robot doğrulaması (captcha) var: {"eylem": "captcha"} ile onay kutusunu işaretle.'
     return (f"MEVCUT SAYFA\nAdres: {sayfa['url']}\nBaşlık: {sayfa['baslik']}{konum}\n"
             f"Öğeler ({len(sayfa['ogeler'])} tane, ekranda görünenler önce):\n"
             + ("\n".join(oge_satiri(o) for o in ogeler) or "(tıklanabilir öğe yok)")
@@ -111,7 +120,8 @@ class SayfaHafizasi:
 
     def _kayit(self, url, baslik=""):
         url = url.split("#")[0]
-        k = self.sayfalar.pop(url, None) or {"baslik": "", "gorulen": 0, "acilmamis": [], "eylemler": [], "notlar": []}
+        k = self.sayfalar.pop(url, None) or {"baslik": "", "gorulen": 0, "acilmamis": [], "eylemler": [], "notlar": [],
+                                             "metin": [], "cumleler": set()}
         k["baslik"] = baslik or k["baslik"]
         self.sayfalar[url] = k
         return k
@@ -120,6 +130,12 @@ class SayfaHafizasi:
         k = self._kayit(sayfa["url"], sayfa["baslik"])
         if sayfa.get("kaydirma"):
             k["gorulen"] = max(k["gorulen"], gorulen_yuzde(sayfa["kaydirma"]))
+        # Kaydırdıkça görülen metin birikir: son analiz gerçekten görülen içerikle yazılsın
+        for cumle in _CUMLE.split(sayfa.get("metin", "")):
+            cumle = cumle.strip()
+            if cumle and cumle not in k["cumleler"] and sum(map(len, k["metin"])) < ayar.SAYFA_METNI:
+                k["cumleler"].add(cumle)
+                k["metin"].append(cumle)
         k["acilmamis"] = [koruma.oge_adi(o) for o in sayfa["ogeler"] if o["etiket"] in ("a", "button")
                           and _daha_fazla_mi(o) and not _SAYFALAMA.search(koruma.sade(koruma.oge_adi(o)))][:3]
 
@@ -134,6 +150,24 @@ class SayfaHafizasi:
         if k["acilmamis"]:
             parca.append("açılmamış " + ", ".join(f"“{a}”" for a in k["acilmamis"]) + " butonu var")
         return " ve ".join(parca)
+
+    def eksik_ziyaret(self):
+        """İnceleme görevleri için: ziyaret edilip tam incelenmeyen sayfalar (arama sonuç sayfaları hariç)."""
+        return [(url, self.eksik(url)) for url in self.sayfalar
+                if not _ARAMA_MOTORU.search(url) and url != "about:blank" and self.eksik(url)]
+
+    def icerik(self, sinir):
+        """Görülen sayfa metinleri, en son ziyaret edilenden başlayarak (en fazla sinir karakter)."""
+        parcalar, toplam = [], 0
+        for url, k in reversed(list(self.sayfalar.items())):
+            if not k["metin"] or _ARAMA_MOTORU.search(url):
+                continue
+            parca = f"[{url}]\n" + " ".join(k["metin"])
+            parcalar.append(parca[:max(0, sinir - toplam)])
+            toplam += len(parca)
+            if toplam >= sinir:
+                break
+        return "\n\n".join(parcalar) or "(yok)"
 
     def eksik_notlu(self):
         return [(url, self.eksik(url)) for url, k in self.sayfalar.items() if k["notlar"] and self.eksik(url)]

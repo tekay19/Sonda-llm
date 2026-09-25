@@ -11,7 +11,7 @@ from . import ayar
 from . import karar as kararlar
 from .eylemler import adim, uygula
 from .istem import istem
-from .promptlar import DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TAMAM, SONUC_PROMPTU
+from .promptlar import CAPTCHA_SEBEBI, DEVAM_METNI, IKI_ADIM_SEBEBI, IKI_ADIM_TAMAM, SONUC_PROMPTU
 from .sayfa import SayfaHafizasi, eksik_form_alanlari, iki_adim_mi
 
 
@@ -98,6 +98,8 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
                 adimlar.append(f"{adim_no}. bitirmek istedi, kaynak yetersiz olduğu için devam{dusunce_ek}")
                 continue
             eksikler = hafiza_.eksik_notlu()
+            if derinlik.get("inceleme"):
+                eksikler += [x for x in hafiza_.eksik_ziyaret() if x not in eksikler]
             if eksikler and bitir_red < ayar.BITIR_RED_SINIRI and adim_no < maks - 3:
                 bitir_red += 1
                 geri_bildirim = ("Henüz bitirme: not aldığın bazı sayfaları tam incelemedin: "
@@ -163,6 +165,23 @@ def dongu(g, gorev_metni, onceki, model, t, durum, derinlik):
             geri_bildirim, son_imza, tekrar = DEVAM_METNI, None, 0
             continue
 
+        if e == "captcha":
+            onaylandi = t.captcha_onayla()
+            yield adim("tikla", "Robot doğrulamasının onay kutusu işaretlendi" if onaylandi else "Robot doğrulaması bulunamadı")
+            adimlar.append(f"{adim_no}. captcha -> {'onay kutusu işaretlendi' if onaylandi else 'bulunamadı'}")
+            geri_bildirim = "Onay kutusu işaretlendi." if onaylandi else "Sayfada işaretlenecek robot doğrulaması bulunamadı."
+            if onaylandi:
+                t.sayfa.wait_for_timeout(int(ayar.CAPTCHA_BEKLE * 1000))
+                if t.bak().get("captcha"):  # resimli bulmaca: kullanıcı çözer, bitince otomatik devam
+                    komut = yield from devret(g, CAPTCHA_SEBEBI, otomatik=lambda: not t.bak().get("captcha"))
+                    if komut not in ("devam", "otomatik"):
+                        durum["hal"] = ("Kullanıcı görevi durdurdu." if komut == "durdur"
+                                        else "Robot doğrulaması 15 dakika içinde çözülmediği için görev bitti.")
+                        durum["kod"] = "durduruldu" if komut == "durdur" else "zaman_asimi"
+                        return
+                    geri_bildirim = "Robot doğrulaması tamamlandı; kaldığın yerden devam et."
+            yapilan += 1
+            continue
         onceki_url = t.url
         if e == "not_al":  # şifre notlara ve oradan cevaba sızmasın
             for gizli in koruma.gizli_adaylar(gorev_metni) | durum["gizli"]:
@@ -207,6 +226,7 @@ def sonuc_yaz(model, gorev_metni, durum):
         gorev_metni = gorev_metni.replace(gizli, "•••")
     istem = SONUC_PROMPTU.format(tarih=bugun(), durum=durum["hal"], gorev=gorev_metni, sonuc=durum["sonuc"] or "(yok)",
                                  notlar="\n".join(satirlar) or "(not yok)", sayfalar=durum["hafiza"].metin(),
+                                 icerik=durum["hafiza"].icerik(ayar.SONUC_ICERIK),
                                  adimlar="\n".join(durum["adimlar"][-15:]) or "(yok)")
     cevap = ""
     for parca in ollama.chat(model=model, stream=True, think=False, options=SECENEKLER,

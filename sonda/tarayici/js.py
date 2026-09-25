@@ -61,6 +61,19 @@ BAK = "() => { const acikla = " + ACIKLA + r""";
 }"""
 
 
+ENGEL = """(e) => {
+  e.scrollIntoView({ block: "center" });
+  const r = e.getBoundingClientRect();
+  const u = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  if (!u || u === e || e.contains(u) || u.contains(e)) return null;
+  const kap = u.closest("[role=dialog], [aria-modal=true], dialog") || u;
+  return (kap.innerText || kap.getAttribute("aria-label") || kap.id || kap.tagName).replace(/\s+/g, " ").trim().slice(0, 120);
+}"""
+
+# Robot doğrulaması (captcha) çerçevelerinin adreslerinde geçen parçalar
+CAPTCHA_ADRESLERI = ("recaptcha/api2/anchor", "recaptcha/enterprise/anchor", "hcaptcha.com", "challenges.cloudflare.com", "turnstile")
+CAPTCHA_KUTULARI = ("#recaptcha-anchor", "#checkbox", "input[type=checkbox]", "[role=checkbox]")
+
 BILGI = "(no) => { const acikla = " + ACIKLA + r""";
   const e = document.querySelector(`[data-sonda-id="${no}"]`);
   if (!e) return null;
