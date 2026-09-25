@@ -28,6 +28,9 @@ ACIKLA = r"""(e) => {
   };
   if (e.tagName === 'SELECT') { d.secenekler = [...e.options].slice(0, 25).map(o => yazi(o.text)); d.deger = yazi(e.selectedOptions[0]?.text); }
   if (e.type === 'checkbox' || e.type === 'radio') d.secili = e.checked;
+  // Gizli kutunun görünen etiketi (Upwork air3): tıklanınca kutu değişir; tipi ve durumu kutudan gelir
+  const k = e.tagName === 'LABEL' ? e.control : null;
+  if (k && (k.type === 'checkbox' || k.type === 'radio')) { d.tip = k.type; d.secili = k.checked; d.ad = k.name || ''; }
   return d;
 }"""
 
@@ -38,8 +41,14 @@ BAK = "() => { const acikla = " + ACIKLA + r""";
   const gorunur = e => { const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return false;
     const s = getComputedStyle(e); return s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
   const ogeler = []; let no = 0;
-  for (const e of document.querySelectorAll(SECICI)) {
-    if (e.disabled || !gorunur(e)) continue;
+  for (let e of document.querySelectorAll(SECICI)) {
+    if (e.disabled) continue;
+    if (!gorunur(e)) {
+      // Ekran okuyucu için gizlenmiş onay kutusu/radyo: görünen etiketi numaralanır
+      const etiket = (e.type === 'checkbox' || e.type === 'radio') && ((e.labels && e.labels[0]) || e.closest('label'));
+      if (!etiket || !gorunur(etiket) || etiket.hasAttribute('data-sonda-id')) continue;
+      e = etiket;
+    }
     e.setAttribute('data-sonda-id', ++no);
     ogeler.push(acikla(e));
   }

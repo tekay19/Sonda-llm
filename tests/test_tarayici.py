@@ -302,3 +302,23 @@ def test_kilitli_sayfada_bak_zaman_asimina_ugrar(tarayici, site, monkeypatch):
     with pytest.raises(Exception):
         tarayici.bak()
     assert time.monotonic() - bas < 8
+
+
+# ---- Upwork: gizli (sr-only) onay kutusu listelenmediği için contract-to-hire işaretlenemedi
+def test_gizli_onay_kutusu_gorunen_etiketiyle_listelenir_ve_isaretlenir(tarayici, site):
+    tarayici.git(f"{site}/gizli_onay.html")
+    kutu = bul(tarayici.bak(), "contract-to-hire opportunities")
+    assert kutu["tip"] == "checkbox" and kutu["secili"] is False
+    tarayici.tikla(kutu["no"])
+    assert tarayici.sayfa.is_checked("[name=c2h]")
+    assert bul(tarayici.bak(), "contract-to-hire opportunities")["secili"] is True
+
+
+def test_gizli_radyo_dugmesi_for_etiketiyle_listelenir(tarayici, site):
+    tarayici.git(f"{site}/gizli_onay.html")
+    s = tarayici.bak()
+    az = bul(s, "Less than 30")
+    assert az["tip"] == "radio" and az["secili"] is False and bul(s, "More than 30")["secili"] is True
+    tarayici.tikla(az["no"])
+    assert tarayici.sayfa.is_checked("#r2")
+    assert len([o for o in s["ogeler"] if "More than 30" in o["metin"]]) == 1  # etiket bir kez listelenir

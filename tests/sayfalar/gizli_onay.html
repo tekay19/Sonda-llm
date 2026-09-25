@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Availability</title>
+<style>
+  /* Upwork (air3) tarzı: gerçek input ekran okuyucular için gizli, görünen kısım label */
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .kutu { display: inline-flex; gap: 8px; padding: 6px; cursor: pointer; }
+  .kutu span.isaret { width: 16px; height: 16px; border: 1px solid #333; display: inline-block; }
+  input:checked + span.isaret { background: #14a800; }
+</style></head>
+<body>
+<div role="dialog" aria-label="Availability">
+  <h2>Contract-to-hire</h2>
+  <label class="kutu"><input type="checkbox" class="sr-only" name="c2h"><span class="isaret"></span>
+    I'm open to contract-to-hire opportunities</label>
+  <input type="radio" id="r1" name="saat" class="sr-only" checked><label for="r1" class="kutu">More than 30 hrs/week</label>
+  <input type="radio" id="r2" name="saat" class="sr-only"><label for="r2" class="kutu">Less than 30 hrs/week</label>
+  <button>Save</button>
+</div>
+</body></html>
